@@ -43,7 +43,8 @@ void ResultTabs::startQueryTab(quint64 queryId, const QString &sql)
     tab->view->setWordWrap(false);
     tab->view->setSelectionBehavior(QAbstractItemView::SelectRows);
     tab->view->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
-    tab->view->horizontalHeader()->setDefaultSectionSize(140);
+    tab->view->horizontalHeader()->setDefaultSectionSize(150);
+    tab->view->horizontalHeader()->setStretchLastSection(true);
     tab->view->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
     tab->statusLabel = new QLabel(QStringLiteral("执行中…"), page);
     tab->statusLabel->setContentsMargins(6, 2, 6, 4);

@@ -57,6 +57,7 @@ void SchemaTree::setCatalog(const QVector<TableInfo> &tables)
             columnItem->setData(0, kRoleColumnName, column.name);
         }
     }
+    resizeColumnToContents(0);
 }
 
 void SchemaTree::showContextMenu(const QPoint &pos)

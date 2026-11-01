@@ -4,6 +4,14 @@ English | [简体中文](README.zh_CN.md)
 
 A cross-platform [DuckDB](https://duckdb.org) desktop client — pure C++ / Qt Widgets / DuckDB v1 C API, statically linked for single-binary distribution.
 
+![DucQ main window](docs/screenshots/main-window.png)
+
+*Schema tree, SQL editor with highlighting, and a virtualized result table — the query above created the `users` table from a `range()` and reads it back.*
+
+![DucQ result table with NULLs](docs/screenshots/null-values.png)
+
+*NULLs render in gray, numeric columns right-align, and every query opens in its own result tab.*
+
 ## Features
 
 - Open / create `.duckdb` database files; an in-memory database works out of the box

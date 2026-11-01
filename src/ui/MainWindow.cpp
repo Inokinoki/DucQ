@@ -107,12 +107,14 @@ void MainWindow::buildUi()
     verticalSplitter->addWidget(m_resultTabs);
     verticalSplitter->setStretchFactor(0, 2);
     verticalSplitter->setStretchFactor(1, 3);
+    verticalSplitter->setSizes({280, 480});
 
     auto *horizontalSplitter = new QSplitter(Qt::Horizontal);
     horizontalSplitter->addWidget(m_schemaTree);
     horizontalSplitter->addWidget(verticalSplitter);
     horizontalSplitter->setStretchFactor(0, 1);
     horizontalSplitter->setStretchFactor(1, 4);
+    horizontalSplitter->setSizes({230, 1030});
     setCentralWidget(horizontalSplitter);
 
     connect(m_schemaTree, &SchemaTree::tableActivated, this, [this](const QString &qualifiedName) {
