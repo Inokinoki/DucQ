@@ -89,6 +89,8 @@ add_library(duckdb_bundle INTERFACE)
 target_include_directories(duckdb_bundle SYSTEM INTERFACE
     "${duckdb_headers_SOURCE_DIR}"
     "${duckdb_libs_SOURCE_DIR}")
+# Link the static archives, not the (nonexistent) DLL import stubs.
+target_compile_definitions(duckdb_bundle INTERFACE DUCKDB_STATIC_BUILD)
 if(UNIX AND NOT APPLE)
     # GNU ld is single-pass: core <-> extension symbol cycles need a group.
     list(INSERT DUCKDB_LINK_LIBS 0 "-Wl,--start-group")
@@ -126,7 +128,7 @@ add_executable(DucQ WIN32 MACOSX_BUNDLE
 target_include_directories(DucQ PRIVATE src)
 target_link_libraries(DucQ PRIVATE Qt6::Widgets duckdb_bundle)
 if(MSVC)
-    target_compile_options(DucQ PRIVATE /W4 /bigobj /permissive-)
+    target_compile_options(DucQ PRIVATE /W4 /bigobj /permissive- /utf-8)
 else()
     target_compile_options(DucQ PRIVATE -Wall -Wextra)
 endif()
@@ -141,7 +143,7 @@ add_executable(test_core
 target_include_directories(test_core PRIVATE src)
 target_link_libraries(test_core PRIVATE Qt6::Test duckdb_bundle)
 if(MSVC)
-    target_compile_options(test_core PRIVATE /W4 /bigobj /permissive-)
+    target_compile_options(test_core PRIVATE /W4 /bigobj /permissive- /utf-8)
 else()
     target_compile_options(test_core PRIVATE -Wall -Wextra)
 endif()

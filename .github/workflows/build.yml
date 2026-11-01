@@ -32,8 +32,15 @@ jobs:
         if: matrix.name != 'linux'
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.8'
+          version: '6.10'
+          arch: ${{ matrix.name == 'windows' && 'win64_msvc2022_64' || 'clang_64' }}
           cache: true
+
+      # Make sure the MSVC environment wins over the MinGW in the runner PATH,
+      # so Ninja picks cl.exe (the DuckDB/Qt artifacts are MSVC builds).
+      - name: Set up MSVC (Windows)
+        if: matrix.name == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Configure
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
