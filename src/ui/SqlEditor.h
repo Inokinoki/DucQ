@@ -36,6 +36,7 @@ public:
     QPlainTextEdit *editorWidget() const { return m_editor; }
     void setPlainText(const QString &text);
     QString toPlainText() const;
+    void retranslateUi();
 
 signals:
     void executeRequested();

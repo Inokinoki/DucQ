@@ -82,7 +82,6 @@ SqlEditor::SqlEditor(QWidget *parent)
     font.setPointSize(qMax(font.pointSize(), 12));
     m_editor->setFont(font);
     m_editor->setTabStopDistance(4 * m_editor->fontMetrics().horizontalAdvance(QLatin1Char(' ')));
-    m_editor->setPlaceholderText(QStringLiteral("-- Ctrl+Enter 执行 SQL，示例：\nSELECT * FROM range(10);"));
     m_editor->installEventFilter(this);
 
     new SqlHighlighter(m_editor->document());
@@ -90,6 +89,14 @@ SqlEditor::SqlEditor(QWidget *parent)
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->addWidget(m_editor);
+
+    retranslateUi();
+}
+
+void SqlEditor::retranslateUi()
+{
+    m_editor->setPlaceholderText(
+        tr("-- Ctrl+Enter runs the SQL, e.g.:\nSELECT * FROM range(10);"));
 }
 
 bool SqlEditor::eventFilter(QObject *watched, QEvent *event)

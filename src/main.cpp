@@ -1,6 +1,34 @@
 #include "ui/MainWindow.h"
 
 #include <QApplication>
+#include <QLocale>
+#include <QSettings>
+#include <QTranslator>
+
+namespace {
+// Returns the language code saved in the settings, or the best match for the
+// system locale; falls back to "en".
+QString resolveStartupLanguage()
+{
+    static const char *const kKnown[] = { "en", "zh_CN", "ja", "ko", "de", "fr", "es", "pt_BR", "ru" };
+    const QString saved = QSettings().value(QStringLiteral("language")).toString();
+    for (const char *code : kKnown) {
+        if (saved == QLatin1String(code))
+            return saved;
+    }
+    const QString system = QLocale::system().name(); // e.g. "zh_CN"
+    for (const char *code : kKnown) {
+        if (system == QLatin1String(code))
+            return QLatin1String(code);
+    }
+    const QString systemPrefix = system.section(QLatin1Char('_'), 0, 0);
+    for (const char *code : kKnown) {
+        if (QLatin1String(code).startsWith(systemPrefix) && systemPrefix.size() >= 2)
+            return QLatin1String(code);
+    }
+    return QStringLiteral("en");
+}
+} // namespace
 
 int main(int argc, char *argv[])
 {
@@ -8,6 +36,11 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName(QStringLiteral("DucQ"));
     QApplication::setOrganizationName(QStringLiteral("DucQ"));
     QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
+
+    const QString language = resolveStartupLanguage();
+    auto *translator = new QTranslator(&app);
+    if (language != QLatin1String("en") && translator->load(QStringLiteral(":/i18n/ducq_%1.qm").arg(language)))
+        QApplication::installTranslator(translator);
 
     ducq::MainWindow window;
     window.show();

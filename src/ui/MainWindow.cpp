@@ -9,10 +9,12 @@
 #include "core/ResultCache.h"
 #include "export/Exporter.h"
 
+#include <QActionGroup>
 #include <QApplication>
 #include <QComboBox>
 #include <QDragEnterEvent>
 #include <QDropEvent>
+#include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QLabel>
@@ -23,14 +25,43 @@
 #include <QProgressBar>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QSettings>
 #include <QSplitter>
 #include <QStatusBar>
 #include <QThread>
 #include <QToolBar>
+#include <QTranslator>
 #include <QUrl>
 #include <QVBoxLayout>
 
 namespace ducq {
+namespace {
+
+// Language codes and their native menu labels. The labels are intentionally
+// not translated: every language is shown in its own script.
+struct LanguageEntry {
+    const char *code;
+    const char *nativeName;
+};
+
+const LanguageEntry kLanguages[] = {
+    {"en", "English"},
+    {"zh_CN", "简体中文"},
+    {"ja", "日本語"},
+    {"ko", "한국어"},
+    {"de", "Deutsch"},
+    {"fr", "Français"},
+    {"es", "Español"},
+    {"pt_BR", "Português (Brasil)"},
+    {"ru", "Русский"},
+};
+
+QString translationResourcePath(const QString &code)
+{
+    return QStringLiteral(":/i18n/ducq_%1.qm").arg(code);
+}
+
+} // namespace
 
 MainWindow::MainWindow()
 {
@@ -42,6 +73,9 @@ MainWindow::MainWindow()
     setAcceptDrops(true);
 
     buildUi();
+    m_translator = new QTranslator(this);
+    buildLanguageMenu();
+    retranslateUi();
 
     m_workerThread = new QThread(this);
     m_runner = new QueryRunner(&m_database); // no parent: lives in the worker
@@ -52,7 +86,8 @@ MainWindow::MainWindow()
     // Start with an in-memory database so the app is usable immediately.
     QString error;
     if (!m_database.open(QString(), false, &error)) {
-        QMessageBox::critical(this, QStringLiteral("DucQ"), QStringLiteral("初始化内存数据库失败：%1").arg(error));
+        QMessageBox::critical(this, QStringLiteral("DucQ"),
+                              tr("Failed to initialize the in-memory database: %1").arg(error));
         close();
         return;
     }
@@ -78,16 +113,17 @@ void MainWindow::buildUi()
     m_historyCombo = new QComboBox;
     m_historyCombo->setMinimumContentsLength(40);
     m_historyCombo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
-    m_historyCombo->setToolTip(QStringLiteral("查询历史"));
     m_historyCombo->setEnabled(false);
     connect(m_historyCombo, &QComboBox::activated, this, [this](int index) {
         if (index >= 0 && index < m_history.size())
             m_editor->setPlainText(m_history.at(index));
     });
 
-    auto *runButton = new QPushButton(QStringLiteral("执行 (Ctrl+⏎)"));
+    auto *runButton = new QPushButton;
     connect(runButton, &QPushButton::clicked, this, &MainWindow::runEditorSql);
     connect(m_editor, &SqlEditor::executeRequested, this, &MainWindow::runEditorSql);
+    runButton->setObjectName(QStringLiteral("runButton"));
+    m_runButton = runButton;
 
     auto *editorBar = new QWidget;
     auto *editorBarLayout = new QHBoxLayout(editorBar);
@@ -125,29 +161,31 @@ void MainWindow::buildUi()
     });
     connect(m_schemaTree, &SchemaTree::refreshRequested, this, &MainWindow::refreshCatalog);
 
-    auto *fileMenu = menuBar()->addMenu(QStringLiteral("文件(&F)"));
-    QAction *newAction = fileMenu->addAction(QStringLiteral("新建数据库…"));
-    connect(newAction, &QAction::triggered, this, &MainWindow::newDatabaseFile);
-    QAction *openAction = fileMenu->addAction(QStringLiteral("打开数据库…"));
-    connect(openAction, &QAction::triggered, this, &MainWindow::openDatabaseFile);
-    QAction *closeAction = fileMenu->addAction(QStringLiteral("关闭数据库（回到内存库）"));
-    connect(closeAction, &QAction::triggered, this, &MainWindow::closeDatabase);
-    fileMenu->addSeparator();
-    QAction *exportCsv = fileMenu->addAction(QStringLiteral("导出当前结果为 CSV…"));
-    connect(exportCsv, &QAction::triggered, this, [this] { exportCurrentResult(QStringLiteral("CSV")); });
-    QAction *exportParquet = fileMenu->addAction(QStringLiteral("导出当前结果为 Parquet…"));
-    connect(exportParquet, &QAction::triggered, this, [this] { exportCurrentResult(QStringLiteral("PARQUET")); });
-    fileMenu->addSeparator();
-    QAction *quitAction = fileMenu->addAction(QStringLiteral("退出"));
-    connect(quitAction, &QAction::triggered, this, &MainWindow::close);
+    m_fileMenu = menuBar()->addMenu(QString());
+    m_newAction = m_fileMenu->addAction(QString());
+    connect(m_newAction, &QAction::triggered, this, &MainWindow::newDatabaseFile);
+    m_openAction = m_fileMenu->addAction(QString());
+    connect(m_openAction, &QAction::triggered, this, &MainWindow::openDatabaseFile);
+    m_closeAction = m_fileMenu->addAction(QString());
+    connect(m_closeAction, &QAction::triggered, this, &MainWindow::closeDatabase);
+    m_fileMenu->addSeparator();
+    m_exportCsvAction = m_fileMenu->addAction(QString());
+    connect(m_exportCsvAction, &QAction::triggered, this,
+            [this] { exportCurrentResult(QStringLiteral("CSV")); });
+    m_exportParquetAction = m_fileMenu->addAction(QString());
+    connect(m_exportParquetAction, &QAction::triggered, this,
+            [this] { exportCurrentResult(QStringLiteral("PARQUET")); });
+    m_fileMenu->addSeparator();
+    m_quitAction = m_fileMenu->addAction(QString());
+    connect(m_quitAction, &QAction::triggered, this, &MainWindow::close);
 
     auto *toolbar = addToolBar(QStringLiteral("main"));
     toolbar->setMovable(false);
-    toolbar->addAction(openAction);
-    toolbar->addAction(newAction);
+    toolbar->addAction(m_openAction);
+    toolbar->addAction(m_newAction);
     toolbar->addSeparator();
-    QAction *refreshAction = toolbar->addAction(QStringLiteral("刷新模式"));
-    connect(refreshAction, &QAction::triggered, this, &MainWindow::refreshCatalog);
+    m_refreshToolbarAction = toolbar->addAction(QString());
+    connect(m_refreshToolbarAction, &QAction::triggered, this, &MainWindow::refreshCatalog);
 
     m_connectionLabel = new QLabel(this);
     m_messageLabel = new QLabel(this);
@@ -156,7 +194,7 @@ void MainWindow::buildUi()
     m_progressBar->setRange(0, 100);
     m_progressBar->setFixedWidth(160);
     m_progressBar->setVisible(false);
-    m_cancelButton = new QPushButton(QStringLiteral("取消"), this);
+    m_cancelButton = new QPushButton(this);
     m_cancelButton->setVisible(false);
     connect(m_cancelButton, &QPushButton::clicked, this, &MainWindow::cancelRunningQuery);
 
@@ -165,6 +203,71 @@ void MainWindow::buildUi()
     statusBar()->addPermanentWidget(m_statsLabel);
     statusBar()->addPermanentWidget(m_progressBar);
     statusBar()->addPermanentWidget(m_cancelButton);
+}
+
+void MainWindow::buildLanguageMenu()
+{
+    m_languageMenu = menuBar()->addMenu(QString());
+    m_languageGroup = new QActionGroup(this);
+    m_languageGroup->setExclusive(true);
+    const QString current = QSettings().value(QStringLiteral("language"), QStringLiteral("en")).toString();
+    for (const LanguageEntry &entry : kLanguages) {
+        auto *action = m_languageMenu->addAction(QString::fromUtf8(entry.nativeName));
+        action->setCheckable(true);
+        action->setData(QLatin1String(entry.code));
+        action->setChecked(entry.code == current);
+        m_languageGroup->addAction(action);
+    }
+    connect(m_languageGroup, &QActionGroup::triggered, this, &MainWindow::switchLanguage);
+}
+
+void MainWindow::switchLanguage(QAction *action)
+{
+    applyLanguage(action->data().toString(), true);
+}
+
+void MainWindow::applyLanguage(const QString &code, bool saveSetting)
+{
+    // The English .qm is absent on purpose: removing all translators falls
+    // back to the (English) source strings.
+    QCoreApplication::removeTranslator(m_translator);
+    if (code != QLatin1String("en") && m_translator->load(translationResourcePath(code)))
+        QCoreApplication::installTranslator(m_translator);
+
+    if (saveSetting)
+        QSettings().setValue(QStringLiteral("language"), code);
+
+    // LanguageChange makes Qt re-layout; our own texts are refreshed below.
+    retranslateUi();
+    m_resultTabs->retranslateUi();
+    m_schemaTree->retranslateUi();
+    m_editor->retranslateUi();
+}
+
+void MainWindow::changeEvent(QEvent *event)
+{
+    if (event->type() == QEvent::LanguageChange)
+        retranslateUi();
+    QMainWindow::changeEvent(event);
+}
+
+void MainWindow::retranslateUi()
+{
+    m_runButton->setText(tr("Run (Ctrl+⏎)"));
+    m_historyCombo->setToolTip(tr("Query history"));
+
+    m_fileMenu->setTitle(tr("&File"));
+    m_newAction->setText(tr("New Database…"));
+    m_openAction->setText(tr("Open Database…"));
+    m_closeAction->setText(tr("Close Database (back to in-memory)"));
+    m_exportCsvAction->setText(tr("Export Current Results as CSV…"));
+    m_exportParquetAction->setText(tr("Export Current Results as Parquet…"));
+    m_quitAction->setText(tr("Exit"));
+    m_languageMenu->setTitle(tr("&Language"));
+    m_refreshToolbarAction->setText(tr("Refresh Schema"));
+
+    m_cancelButton->setText(tr("Cancel"));
+    updateConnectionLabel();
 }
 
 void MainWindow::connectRunner()
@@ -180,7 +283,7 @@ bool MainWindow::ensureNotBusy()
     if (m_pendingQueries == 0)
         return true;
     QMessageBox::information(this, QStringLiteral("DucQ"),
-                             QStringLiteral("查询进行中，请等待完成或点击取消后再操作。"));
+                             tr("A query is running. Wait for it to finish or cancel it first."));
     return false;
 }
 
@@ -188,11 +291,11 @@ void MainWindow::newDatabaseFile()
 {
     if (!ensureNotBusy())
         return;
-    QFileDialog dialog(this, QStringLiteral("新建 DuckDB 数据库"));
+    QFileDialog dialog(this, tr("New DuckDB Database"));
     dialog.setAcceptMode(QFileDialog::AcceptSave);
     dialog.setOption(QFileDialog::DontConfirmOverwrite);
     dialog.setDefaultSuffix(QStringLiteral("duckdb"));
-    dialog.setNameFilter(QStringLiteral("DuckDB 数据库 (*.duckdb *.db);;所有文件 (*)"));
+    dialog.setNameFilter(tr("DuckDB databases (*.duckdb *.db);;All files (*)"));
     if (dialog.exec() != QDialog::Accepted)
         return;
     const QStringList files = dialog.selectedFiles();
@@ -205,8 +308,9 @@ void MainWindow::openDatabaseFile()
 {
     if (!ensureNotBusy())
         return;
-    const QString file = QFileDialog::getOpenFileName(this, QStringLiteral("打开 DuckDB 数据库"), QString(),
-                                                      QStringLiteral("DuckDB 数据库 (*.duckdb *.db *.ddb);;所有文件 (*)"));
+    const QString file =
+        QFileDialog::getOpenFileName(this, tr("Open DuckDB Database"), QString(),
+                                     tr("DuckDB databases (*.duckdb *.db *.ddb);;All files (*)"));
     if (!file.isEmpty())
         openDatabase(file);
 }
@@ -223,7 +327,7 @@ void MainWindow::openDatabase(const QString &path)
     QMetaObject::invokeMethod(m_runner, "shutdown", Qt::BlockingQueuedConnection);
     QString error;
     if (!m_database.open(path, false, &error)) {
-        QMessageBox::critical(this, QStringLiteral("打开失败"), error);
+        QMessageBox::critical(this, tr("Open Failed"), error);
         m_database.open(QString(), false, nullptr);
     }
     QMetaObject::invokeMethod(m_runner, "initialize", Qt::BlockingQueuedConnection);
@@ -234,15 +338,15 @@ void MainWindow::openDatabase(const QString &path)
 void MainWindow::updateConnectionLabel()
 {
     if (!m_database.isOpen()) {
-        m_connectionLabel->setText(QStringLiteral("未连接"));
+        m_connectionLabel->setText(tr("Not connected"));
         return;
     }
     if (m_database.isInMemory())
-        m_connectionLabel->setText(QStringLiteral("内存数据库"));
+        m_connectionLabel->setText(tr("In-memory database"));
     else
         m_connectionLabel->setText(m_database.path());
     setWindowTitle(QStringLiteral("DucQ — %1").arg(m_database.isInMemory()
-                                                       ? QStringLiteral("内存数据库")
+                                                       ? tr("In-memory database")
                                                        : QFileInfo(m_database.path()).fileName()));
 }
 
@@ -252,12 +356,12 @@ void MainWindow::exportCurrentResult(const QString &format)
         return;
     const ResultTab *tab = m_resultTabs->currentTab();
     if (!tab || !tab->finished || tab->sql.isEmpty()) {
-        QMessageBox::information(this, QStringLiteral("导出"), QStringLiteral("请先选中一个已完成查询的结果页签。"));
+        QMessageBox::information(this, tr("Export"), tr("Select a finished result tab first."));
         return;
     }
-    const QString filter = format == QLatin1String("PARQUET") ? QStringLiteral("Parquet (*.parquet)")
-                                                              : QStringLiteral("CSV (*.csv)");
-    QString file = QFileDialog::getSaveFileName(this, QStringLiteral("导出结果"), QString(), filter);
+    const QString filter =
+        format == QLatin1String("PARQUET") ? tr("Parquet (*.parquet)") : tr("CSV (*.csv)");
+    QString file = QFileDialog::getSaveFileName(this, tr("Export Results"), QString(), filter);
     if (file.isEmpty())
         return;
     QFileInfo info(file);
@@ -270,7 +374,7 @@ void MainWindow::runEditorSql()
 {
     const QString sql = m_editor->toPlainText().trimmed();
     if (sql.isEmpty()) {
-        setStatusMessage(QStringLiteral("没有可执行的 SQL"));
+        setStatusMessage(tr("No SQL to execute"));
         return;
     }
     runSql(sql);
@@ -294,7 +398,7 @@ void MainWindow::runSql(const QString &sql, const QString &followUpSql)
     m_resultTabs->startQueryTab(queryId, sql);
     ++m_pendingQueries;
     setBusy(true);
-    setStatusMessage(QStringLiteral("执行中…"));
+    setStatusMessage(tr("Running…"));
     QMetaObject::invokeMethod(m_runner, "execute", Qt::QueuedConnection, Q_ARG(quint64, queryId),
                               Q_ARG(QString, sql));
 }
@@ -330,8 +434,6 @@ void MainWindow::onResultReady(quint64 queryId, quintptr resultPtr, const QVecto
     auto *result = reinterpret_cast<duckdb_result *>(resultPtr);
     if (!m_resultTabs->deliverResult(queryId, resultPtr, columns))
         ResultCache::destroyResult(result);
-    Q_UNUSED(queryId);
-    Q_UNUSED(result);
 }
 
 void MainWindow::onQueryFinished(quint64 queryId, qint64 elapsedMs, qsizetype totalRows, bool cancelled,
@@ -345,14 +447,14 @@ void MainWindow::onQueryFinished(quint64 queryId, qint64 elapsedMs, qsizetype to
     m_resultTabs->markFinished(queryId, elapsedMs, totalRows, cancelled, error);
 
     if (cancelled) {
-        setStatusMessage(QStringLiteral("查询已取消"));
+        setStatusMessage(tr("Query cancelled"));
         return;
     }
     if (!error.isEmpty()) {
         setStatusMessage(error);
         return;
     }
-    setStatusMessage(QStringLiteral("完成：%L1 行 · %L2 ms").arg(totalRows).arg(elapsedMs));
+    setStatusMessage(tr("Done: %L1 rows · %L2 ms").arg(totalRows).arg(elapsedMs));
     const auto followUp = m_followUps.take(queryId);
     if (!followUp.isEmpty()) {
         runSql(followUp);
@@ -370,7 +472,7 @@ void MainWindow::onProgressChanged(quint64 queryId, double percentage)
 void MainWindow::onCatalogReady(const QVector<TableInfo> &tables)
 {
     m_schemaTree->setCatalog(tables);
-    setStatusMessage(QStringLiteral("模式已刷新：%1 个表/视图").arg(tables.size()));
+    setStatusMessage(tr("Schema refreshed: %1 tables/views").arg(tables.size()));
 }
 
 void MainWindow::setBusy(bool busy)
@@ -378,7 +480,6 @@ void MainWindow::setBusy(bool busy)
     m_progressBar->setVisible(busy);
     m_progressBar->setValue(0);
     m_cancelButton->setVisible(busy);
-    m_statsLabel->setText(busy ? QString() : m_statsLabel->text());
 }
 
 void MainWindow::setStatusMessage(const QString &message)
@@ -409,7 +510,7 @@ void MainWindow::dropEvent(QDropEvent *event)
         QString viewName;
         const QString viewSql = DropImport::buildCreateViewSql(file, &viewName);
         if (viewSql.isEmpty()) {
-            setStatusMessage(QStringLiteral("跳过不支持的文件：%1").arg(QFileInfo(file).fileName()));
+            setStatusMessage(tr("Skipped unsupported file: %1").arg(QFileInfo(file).fileName()));
             continue;
         }
         runSql(viewSql, DropImport::buildPreviewSql(viewName));

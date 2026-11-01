@@ -102,7 +102,7 @@ duckdb_state QueryRunner::runPendingStatement(duckdb_prepared_statement statemen
     if (duckdb_pending_prepared(statement, &pending) != DuckDBSuccess) {
         const char *error = duckdb_prepare_error(statement);
         if (outError)
-            *outError = error ? QString::fromUtf8(error) : QStringLiteral("预处理语句失败");
+            *outError = error ? QString::fromUtf8(error) : tr("Failed to prepare statement");
         return DuckDBError;
     }
 
@@ -114,7 +114,7 @@ duckdb_state QueryRunner::runPendingStatement(duckdb_prepared_statement statemen
             if (state == DUCKDB_PENDING_ERROR) {
                 const char *error = duckdb_pending_error(pending);
                 if (outError)
-                    *outError = error ? QString::fromUtf8(error) : QStringLiteral("执行出错");
+                    *outError = error ? QString::fromUtf8(error) : tr("Execution failed");
                 resultState = DuckDBError;
             }
             break;
@@ -129,7 +129,7 @@ duckdb_state QueryRunner::runPendingStatement(duckdb_prepared_statement statemen
         if (resultState != DuckDBSuccess) {
             const char *error = duckdb_result_error(outResult);
             if (outError)
-                *outError = error ? QString::fromUtf8(error) : QStringLiteral("执行出错");
+                *outError = error ? QString::fromUtf8(error) : tr("Execution failed");
         }
     }
     duckdb_destroy_pending(&pending);
@@ -157,14 +157,14 @@ void QueryRunner::execute(quint64 queryId, const QString &sql)
     qsizetype totalRows = 0;
 
     if (!m_connection) {
-        error = QStringLiteral("数据库连接未初始化");
+        error = tr("Database connection not initialized");
     } else {
         duckdb_extracted_statements extracted = nullptr;
         const QByteArray utf8 = sql.toUtf8();
         const idx_t statementCount = duckdb_extract_statements(m_connection, utf8.constData(), &extracted);
         if (statementCount == 0) {
             const char *extractError = duckdb_extract_statements_error(extracted);
-            error = extractError ? QString::fromUtf8(extractError) : QStringLiteral("无法解析 SQL");
+            error = extractError ? QString::fromUtf8(extractError) : tr("Failed to parse the SQL");
         } else {
             for (idx_t i = 0; i < statementCount; ++i) {
                 if (m_cancelRequested) {
@@ -174,10 +174,10 @@ void QueryRunner::execute(quint64 queryId, const QString &sql)
                 duckdb_prepared_statement statement = nullptr;
                 if (duckdb_prepare_extracted_statement(m_connection, extracted, i, &statement) != DuckDBSuccess) {
                     const char *prepareError = duckdb_prepare_error(statement);
-                    error = QStringLiteral("语句 %1/%2: %3")
+                    error = tr("Statement %1/%2: %3")
                                 .arg(i + 1)
                                 .arg(int(statementCount))
-                                .arg(prepareError ? QString::fromUtf8(prepareError) : QStringLiteral("预处理失败"));
+                                .arg(prepareError ? QString::fromUtf8(prepareError) : tr("prepare failed"));
                     break;
                 }
                 duckdb_result statementResult {};
@@ -187,10 +187,10 @@ void QueryRunner::execute(quint64 queryId, const QString &sql)
                                                                &statementError, &statementCancelled);
                 duckdb_destroy_prepare(&statement);
                 if (state != DuckDBSuccess) {
-                    error = QStringLiteral("语句 %1/%2: %3")
+                    error = tr("Statement %1/%2: %3")
                                 .arg(i + 1)
                                 .arg(int(statementCount))
-                                .arg(statementError.isEmpty() ? QStringLiteral("执行出错") : statementError);
+                                .arg(statementError.isEmpty() ? tr("Execution failed") : statementError);
                     cancelled = statementCancelled;
                     if (cancelled)
                         error.clear();

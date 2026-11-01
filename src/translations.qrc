@@ -1,0 +1,13 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/i18n">
+        <file alias="ducq_zh_CN.qm">../translations/ducq_zh_CN.qm</file>
+        <file alias="ducq_ja.qm">../translations/ducq_ja.qm</file>
+        <file alias="ducq_ko.qm">../translations/ducq_ko.qm</file>
+        <file alias="ducq_de.qm">../translations/ducq_de.qm</file>
+        <file alias="ducq_fr.qm">../translations/ducq_fr.qm</file>
+        <file alias="ducq_es.qm">../translations/ducq_es.qm</file>
+        <file alias="ducq_pt_BR.qm">../translations/ducq_pt_BR.qm</file>
+        <file alias="ducq_ru.qm">../translations/ducq_ru.qm</file>
+    </qresource>
+</RCC>

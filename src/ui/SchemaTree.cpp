@@ -13,7 +13,6 @@ constexpr int kRoleColumnName = Qt::UserRole + 2;
 SchemaTree::SchemaTree(QWidget *parent)
     : QTreeWidget(parent)
 {
-    setHeaderLabels({ QStringLiteral("对象"), QStringLiteral("类型") });
     setColumnWidth(0, 200);
     setAlternatingRowColors(true);
     setContextMenuPolicy(Qt::CustomContextMenu);
@@ -29,6 +28,12 @@ SchemaTree::SchemaTree(QWidget *parent)
         if (!column.isEmpty())
             emit columnActivated(column);
     });
+    retranslateUi();
+}
+
+void SchemaTree::retranslateUi()
+{
+    setHeaderLabels({ tr("Object"), tr("Type") });
 }
 
 void SchemaTree::setCatalog(const QVector<TableInfo> &tables)
@@ -64,7 +69,7 @@ void SchemaTree::showContextMenu(const QPoint &pos)
 {
     auto *menu = new QMenu(this);
     menu->setAttribute(Qt::WA_DeleteOnClose);
-    QAction *refresh = menu->addAction(QStringLiteral("刷新模式"));
+    QAction *refresh = menu->addAction(tr("Refresh Schema"));
     connect(refresh, &QAction::triggered, this, &SchemaTree::refreshRequested);
     menu->popup(viewport()->mapToGlobal(pos));
 }

@@ -15,11 +15,16 @@ class ResultModel;
 
 struct ResultTab {
     quint64 queryId = 0;
+    int number = 0; // stable display number, used for retranslation
     QString sql;
     ResultModel *model = nullptr;
     QTableView *view = nullptr;
     QLabel *statusLabel = nullptr;
     bool finished = false;
+    bool cancelled = false;
+    QString error;
+    qint64 elapsedMs = 0;
+    qsizetype totalRows = 0;
 };
 
 // One tab per executed query: model + table view + a status line. Results are
@@ -39,8 +44,10 @@ public:
     void markFinished(quint64 queryId, qint64 elapsedMs, qsizetype totalRows, bool cancelled, const QString &error);
     const ResultTab *currentTab() const;
     void clearFinished();
+    void retranslateUi();
 
 private:
+    void renderStatus(ResultTab *tab);
     ResultTab *tabFor(quint64 queryId);
 
     QHash<quint64, ResultTab *> m_tabs;

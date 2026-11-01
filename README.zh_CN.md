@@ -22,6 +22,7 @@
 - 拖入 `csv / tsv / parquet / json` 文件自动建视图并预览
 - 结果导出 CSV / Parquet（`COPY` 流式写出，不受展示行数限制）
 - 查询历史快速重跑
+- 界面支持 9 种语言，菜单内随时切换：English、简体中文、日本語、한국어、Deutsch、Français、Español、Português (Brasil)、Русский
 
 ## 构建
 
@@ -62,7 +63,10 @@ cmake --build build
 - [ ] SQL 自动补全（autocomplete 扩展已静态链接）
 - [ ] 内置图表、结果筛选排序
 - [ ] 安装包分发（macOS 签名公证 / Windows installer / AppImage）
-- [ ] 国际化（当前 UI 为中文）
+
+新增或更新翻译：运行 `lupdate src tests -ts translations/ducq_<lang>.ts`，在
+`scripts/fill_translations.py` 中填写译文（或直接编辑 `.ts`），然后 `lrelease`。编译后的
+`.qm` 通过 `src/translations.qrc` 嵌入。
 
 ## 许可
 

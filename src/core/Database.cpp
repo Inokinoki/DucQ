@@ -2,6 +2,8 @@
 
 #include "StaticExtensions.h"
 
+#include <QObject>
+
 namespace ducq {
 
 bool Database::open(const QString &path, bool readOnly, QString *errorMessage)
@@ -13,7 +15,7 @@ bool Database::open(const QString &path, bool readOnly, QString *errorMessage)
     if (readOnly) {
         if (duckdb_create_config(&config) != DuckDBSuccess) {
             if (errorMessage)
-                *errorMessage = QStringLiteral("无法创建数据库配置");
+                *errorMessage = QObject::tr("Failed to create the database configuration");
             return false;
         }
         duckdb_set_config(config, "access_mode", "READ_ONLY");
@@ -22,11 +24,12 @@ bool Database::open(const QString &path, bool readOnly, QString *errorMessage)
     const QByteArray utf8 = path.toUtf8();
     char *openError = nullptr;
     const duckdb_state state = duckdb_open_ext(path.isEmpty() ? nullptr : utf8.constData(), &m_db, config,
-                                               &openError);
+                                              &openError);
     duckdb_destroy_config(&config);
     if (state != DuckDBSuccess) {
         if (errorMessage)
-            *errorMessage = openError ? QString::fromUtf8(openError) : QStringLiteral("无法打开数据库");
+            *errorMessage = openError ? QString::fromUtf8(openError)
+                                      : QObject::tr("Failed to open the database");
         if (openError)
             duckdb_free(openError);
         m_db = nullptr;

@@ -10,6 +10,7 @@ project(DucQ VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Test)
 find_package(Threads REQUIRED)
@@ -126,6 +127,7 @@ set(DUCQ_CORE_SOURCES
 add_executable(DucQ WIN32 MACOSX_BUNDLE
     ${DUCQ_CORE_SOURCES}
     src/main.cpp
+    src/translations.qrc
     src/ui/MainWindow.cpp src/ui/MainWindow.h
     src/ui/SchemaTree.cpp src/ui/SchemaTree.h
     src/ui/SqlEditor.cpp src/ui/SqlEditor.h

@@ -11,7 +11,10 @@
 class QComboBox;
 class QDragEnterEvent;
 class QDropEvent;
+class QActionGroup;
 class QLabel;
+class QMenu;
+class QTranslator;
 class QProgressBar;
 class QPushButton;
 class QSplitter;
@@ -31,6 +34,7 @@ public:
     ~MainWindow() override;
 
 protected:
+    void changeEvent(QEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dropEvent(QDropEvent *event) override;
 
@@ -42,6 +46,7 @@ private slots:
     void runEditorSql();
     void refreshCatalog();
     void cancelRunningQuery();
+    void switchLanguage(QAction *action);
 
     void onResultReady(quint64 queryId, quintptr resultPtr, const QVector<ducq::ColumnMeta> &columns);
     void onQueryFinished(quint64 queryId, qint64 elapsedMs, qsizetype totalRows, bool cancelled, const QString &error);
@@ -50,7 +55,10 @@ private slots:
 
 private:
     void buildUi();
+    void buildLanguageMenu();
     void connectRunner();
+    void retranslateUi();
+    void applyLanguage(const QString &code, bool saveSetting);
     void openDatabase(const QString &path); // empty path -> in-memory
     bool ensureNotBusy();
     void setBusy(bool busy);
@@ -72,6 +80,19 @@ private:
     QLabel *m_statsLabel = nullptr;
     QProgressBar *m_progressBar = nullptr;
     QPushButton *m_cancelButton = nullptr;
+    QPushButton *m_runButton = nullptr;
+
+    QMenu *m_fileMenu = nullptr;
+    QMenu *m_languageMenu = nullptr;
+    QActionGroup *m_languageGroup = nullptr;
+    QTranslator *m_translator = nullptr;
+    QAction *m_newAction = nullptr;
+    QAction *m_openAction = nullptr;
+    QAction *m_closeAction = nullptr;
+    QAction *m_exportCsvAction = nullptr;
+    QAction *m_exportParquetAction = nullptr;
+    QAction *m_quitAction = nullptr;
+    QAction *m_refreshToolbarAction = nullptr;
 
     quint64 m_nextQueryId = 1;
     int m_pendingQueries = 0;

@@ -34,6 +34,7 @@ void ResultTabs::startQueryTab(quint64 queryId, const QString &sql)
 {
     auto *tab = new ResultTab;
     tab->queryId = queryId;
+    tab->number = ++m_counter;
     tab->sql = sql;
     auto *page = new QWidget;
     tab->model = new ResultModel(m_displayRowLimit, page);
@@ -46,7 +47,7 @@ void ResultTabs::startQueryTab(quint64 queryId, const QString &sql)
     tab->view->horizontalHeader()->setDefaultSectionSize(150);
     tab->view->horizontalHeader()->setStretchLastSection(true);
     tab->view->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
-    tab->statusLabel = new QLabel(QStringLiteral("执行中…"), page);
+    tab->statusLabel = new QLabel(tr("Running…"), page);
     tab->statusLabel->setContentsMargins(6, 2, 6, 4);
 
     auto *layout = new QVBoxLayout(page);
@@ -55,7 +56,7 @@ void ResultTabs::startQueryTab(quint64 queryId, const QString &sql)
     layout->addWidget(tab->view, 1);
     layout->addWidget(tab->statusLabel);
 
-    const int index = addTab(page, QStringLiteral("结果 %1").arg(++m_counter));
+    const int index = addTab(page, tr("Result %1").arg(tab->number));
     setCurrentIndex(index);
     m_tabs.insert(queryId, tab);
     m_tabsByWidget.insert(page, tab);
@@ -103,21 +104,30 @@ void ResultTabs::markFinished(quint64 queryId, qint64 elapsedMs, qsizetype total
     if (!tab)
         return;
     tab->finished = true;
-    if (!error.isEmpty()) {
+    tab->cancelled = cancelled;
+    tab->error = error;
+    tab->elapsedMs = elapsedMs;
+    tab->totalRows = totalRows;
+    renderStatus(tab);
+}
+
+void ResultTabs::renderStatus(ResultTab *tab)
+{
+    if (!tab->error.isEmpty()) {
         tab->statusLabel->setStyleSheet(QStringLiteral("color: #c62828;"));
-        tab->statusLabel->setText(error);
+        tab->statusLabel->setText(tab->error);
         return;
     }
-    tab->statusLabel->setStyleSheet(cancelled ? QStringLiteral("color: #b26a00;") : QString());
-    if (cancelled) {
-        tab->statusLabel->setText(QStringLiteral("已取消 · %L1 ms").arg(elapsedMs));
+    tab->statusLabel->setStyleSheet(tab->cancelled ? QStringLiteral("color: #b26a00;") : QString());
+    if (tab->cancelled) {
+        tab->statusLabel->setText(tr("Cancelled · %L1 ms").arg(tab->elapsedMs));
         return;
     }
     const qsizetype displayedRows = tab->model->cache.rowCount();
     const bool truncated = tab->model->cache.truncated();
-    QString text = QStringLiteral("%L1 行 · %L2 ms").arg(displayedRows).arg(elapsedMs);
+    QString text = tr("%L1 rows · %L2 ms").arg(displayedRows).arg(tab->elapsedMs);
     if (truncated)
-        text += QStringLiteral("（共 %L1 行，仅展示前 %L2 行）").arg(totalRows).arg(displayedRows);
+        text += tr(" (of %L1 rows, showing first %L2)").arg(tab->totalRows).arg(displayedRows);
     tab->statusLabel->setText(text);
 }
 
@@ -136,6 +146,19 @@ void ResultTabs::clearFinished()
                 removeTab(i);
                 delete tab;
             }
+        }
+    }
+}
+
+void ResultTabs::retranslateUi()
+{
+    for (int i = 0; i < count(); ++i) {
+        if (ResultTab *tab = m_tabsByWidget.value(widget(i))) {
+            setTabText(i, tr("Result %1").arg(tab->number));
+            if (tab->finished)
+                renderStatus(tab);
+            else
+                tab->statusLabel->setText(tr("Running…"));
         }
     }
 }

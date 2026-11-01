@@ -22,6 +22,7 @@ A cross-platform [DuckDB](https://duckdb.org) desktop client — pure C++ / Qt W
 - Drag in `csv / tsv / parquet / json` files to auto-create views and preview them
 - Export results to CSV / Parquet (`COPY` streams server-side, unaffected by the display row limit)
 - Query history with quick re-run
+- UI in 9 languages, switchable at runtime from the menu: English, 简体中文, 日本語, 한국어, Deutsch, Français, Español, Português (Brasil), Русский
 
 ## Build
 
@@ -62,7 +63,10 @@ Three-platform CI: see [.github/workflows/build.yml](.github/workflows/build.yml
 - [ ] SQL autocompletion (the autocomplete extension is already statically linked)
 - [ ] Built-in charts, result filtering & sorting
 - [ ] Packaged distribution (macOS notarization / Windows installer / AppImage)
-- [ ] Internationalization (the UI is currently in Chinese)
+
+To add or update a translation: run `lupdate src tests -ts translations/ducq_<lang>.ts`, fill in
+`scripts/fill_translations.py` (or edit the `.ts` directly), then `lrelease`. The compiled `.qm`
+files are embedded via `src/translations.qrc`.
 
 ## License
 

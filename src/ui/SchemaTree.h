@@ -16,6 +16,7 @@ public:
 
 public slots:
     void setCatalog(const QVector<ducq::TableInfo> &tables);
+    void retranslateUi();
 
 signals:
     void tableActivated(const QString &qualifiedName);
