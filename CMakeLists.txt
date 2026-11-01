@@ -108,6 +108,9 @@ endif()
 target_link_libraries(duckdb_bundle INTERFACE ${DUCKDB_LINK_LIBS} Threads::Threads)
 if(NOT WIN32)
     target_link_libraries(duckdb_bundle INTERFACE ${CMAKE_DL_LIBS} m)
+else()
+    # Restart Manager API used by DuckDB's file-lock diagnostics.
+    target_link_libraries(duckdb_bundle INTERFACE Rstrtmgr.lib)
 endif()
 
 # ---------------------------------------------------------------------------
