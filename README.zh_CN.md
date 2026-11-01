@@ -4,6 +4,14 @@
 
 跨平台 [DuckDB](https://duckdb.org) 桌面客户端 —— 纯 C++ / Qt Widgets / DuckDB v1 C API，静态链接，单文件分发。
 
+![DucQ 主窗口](docs/screenshots/main-window.png)
+
+*模式树、SQL 高亮编辑器与虚拟化结果表格 —— 上图中的 `users` 表由 `range()` 直接生成并读回。*
+
+![DucQ NULL 值展示](docs/screenshots/null-values.png)
+
+*NULL 以灰色渲染、数值列右对齐，每个查询在独立的结果页签中展示。*
+
 ## 功能
 
 - 打开 / 新建 `.duckdb` 数据库文件，内置内存数据库开箱即用
