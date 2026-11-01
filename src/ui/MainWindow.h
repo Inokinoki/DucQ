@@ -33,6 +33,10 @@ public:
     MainWindow();
     ~MainWindow() override;
 
+    // Startup hooks for the command line (see main.cpp).
+    void openDatabaseFileAtStartup(const QString &path);
+    void executeScriptAtStartup(const QString &scriptPath);
+
 protected:
     void changeEvent(QEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;

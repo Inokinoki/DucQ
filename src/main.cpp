@@ -1,6 +1,7 @@
 #include "ui/MainWindow.h"
 
 #include <QApplication>
+#include <QCommandLineParser>
 #include <QLocale>
 #include <QSettings>
 #include <QTranslator>
@@ -42,7 +43,27 @@ int main(int argc, char *argv[])
     if (language != QLatin1String("en") && translator->load(QStringLiteral(":/i18n/ducq_%1.qm").arg(language)))
         QApplication::installTranslator(translator);
 
+    QCommandLineParser parser;
+    parser.setApplicationDescription(QStringLiteral("DucQ — DuckDB GUI"));
+    parser.addHelpOption();
+    parser.addPositionalArgument(QStringLiteral("database"),
+                                 QStringLiteral("Database file to open at startup (omit for in-memory)."),
+                                 QStringLiteral("[database]"));
+    QCommandLineOption executeOption(QStringLiteral("execute"),
+                                     QStringLiteral("Run the SQL script after startup."));
+    executeOption.setValueName(QStringLiteral("file"));
+    parser.addOption(executeOption);
+    parser.process(app);
+
     ducq::MainWindow window;
     window.show();
+
+    const QStringList positional = parser.positionalArguments();
+    if (!positional.isEmpty())
+        window.openDatabaseFileAtStartup(positional.first());
+    const QString script = parser.value(executeOption);
+    if (!script.isEmpty())
+        window.executeScriptAtStartup(script);
+
     return QApplication::exec();
 }

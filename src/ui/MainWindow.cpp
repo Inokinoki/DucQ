@@ -15,6 +15,7 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QEvent>
+#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QLabel>
@@ -103,6 +104,32 @@ MainWindow::~MainWindow()
         m_workerThread->wait();
     }
     delete m_runner; // thread stopped, safe to delete from here
+}
+
+void MainWindow::openDatabaseFileAtStartup(const QString &path)
+{
+    QMetaObject::invokeMethod(m_runner, "shutdown", Qt::BlockingQueuedConnection);
+    QString error;
+    if (!m_database.open(path, false, &error)) {
+        QMessageBox::critical(this, tr("Open Failed"), error);
+        m_database.open(QString(), false, nullptr);
+    }
+    QMetaObject::invokeMethod(m_runner, "initialize", Qt::BlockingQueuedConnection);
+    updateConnectionLabel();
+    refreshCatalog();
+}
+
+void MainWindow::executeScriptAtStartup(const QString &scriptPath)
+{
+    QFile scriptFile(scriptPath);
+    if (!scriptFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        setStatusMessage(tr("Cannot read script: %1").arg(scriptPath));
+        return;
+    }
+    const QString sql = QString::fromUtf8(scriptFile.readAll());
+    m_editor->setPlainText(sql);
+    runSql(sql);
+    pushHistory(sql);
 }
 
 void MainWindow::buildUi()
