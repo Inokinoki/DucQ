@@ -1,6 +1,6 @@
 # DucQ 🦆
 
-English | [简体中文](README.zh_CH.md)
+English | [简体中文](README.zh_CN.md)
 
 A cross-platform [DuckDB](https://duckdb.org) desktop client — pure C++ / Qt Widgets / DuckDB v1 C API, statically linked for single-binary distribution.
 
