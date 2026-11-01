@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.24)
 
+# The prebuilt DuckDB static libraries for Windows are built with the static
+# CRT (/MT); match that so LNK2038 doesn't fire. Qt is loaded as DLLs and is
+# unaffected.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
 project(DucQ VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
