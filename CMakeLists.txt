@@ -119,6 +119,7 @@ endif()
 # ---------------------------------------------------------------------------
 set(DUCQ_CORE_SOURCES
     src/core/StaticExtensions.cpp
+    src/core/AppSettings.cpp
     src/core/Database.cpp
     src/core/ResultCache.cpp
     src/core/QueryRunner.cpp
@@ -142,6 +143,7 @@ if(MSVC)
 else()
     target_compile_options(DucQ PRIVATE -Wall -Wextra)
 endif()
+set_target_properties(DucQ PROPERTIES MACOSX_BUNDLE_GUI_IDENTIFIER "cc.inoki.DucQ")
 
 # ---------------------------------------------------------------------------
 # Tests

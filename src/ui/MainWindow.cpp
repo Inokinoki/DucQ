@@ -4,10 +4,13 @@
 #include "ResultTabs.h"
 #include "SchemaTree.h"
 #include "SqlEditor.h"
+#include "core/AppSettings.h"
 #include "core/Catalog.h"
 #include "core/QueryRunner.h"
 #include "core/ResultCache.h"
 #include "export/Exporter.h"
+
+#include <memory>
 
 #include <QActionGroup>
 #include <QApplication>
@@ -237,7 +240,8 @@ void MainWindow::buildLanguageMenu()
     m_languageMenu = menuBar()->addMenu(QString());
     m_languageGroup = new QActionGroup(this);
     m_languageGroup->setExclusive(true);
-    const QString current = QSettings().value(QStringLiteral("language"), QStringLiteral("en")).toString();
+    std::unique_ptr<QSettings> settings(ducq::AppSettings::create());
+    const QString current = settings->value(QStringLiteral("language"), QStringLiteral("en")).toString();
     for (const LanguageEntry &entry : kLanguages) {
         auto *action = m_languageMenu->addAction(QString::fromUtf8(entry.nativeName));
         action->setCheckable(true);
@@ -261,8 +265,10 @@ void MainWindow::applyLanguage(const QString &code, bool saveSetting)
     if (code != QLatin1String("en") && m_translator->load(translationResourcePath(code)))
         QCoreApplication::installTranslator(m_translator);
 
-    if (saveSetting)
-        QSettings().setValue(QStringLiteral("language"), code);
+    if (saveSetting) {
+        std::unique_ptr<QSettings> settings(ducq::AppSettings::create());
+        settings->setValue(QStringLiteral("language"), code);
+    }
 
     // LanguageChange makes Qt re-layout; our own texts are refreshed below.
     retranslateUi();

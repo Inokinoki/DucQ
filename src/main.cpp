@@ -1,10 +1,13 @@
 #include "ui/MainWindow.h"
 
+#include "core/AppSettings.h"
+
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QLocale>
 #include <QSettings>
 #include <QTranslator>
+#include <memory>
 
 namespace {
 // Returns the language code saved in the settings, or the best match for the
@@ -12,7 +15,8 @@ namespace {
 QString resolveStartupLanguage()
 {
     static const char *const kKnown[] = { "en", "zh_CN", "ja", "ko", "de", "fr", "es", "pt_BR", "ru" };
-    const QString saved = QSettings().value(QStringLiteral("language")).toString();
+    std::unique_ptr<QSettings> settings(ducq::AppSettings::create());
+    const QString saved = settings->value(QStringLiteral("language")).toString();
     for (const char *code : kKnown) {
         if (saved == QLatin1String(code))
             return saved;
@@ -35,7 +39,8 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("DucQ"));
-    QApplication::setOrganizationName(QStringLiteral("DucQ"));
+    QApplication::setOrganizationName(QStringLiteral("Inoki"));
+    QApplication::setOrganizationDomain(QStringLiteral("cc.inoki"));
     QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
 
     const QString language = resolveStartupLanguage();
