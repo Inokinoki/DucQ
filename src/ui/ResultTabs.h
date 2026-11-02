@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QHash>
+#include <QModelIndex>
 #include <QTabWidget>
 #include <QVector>
 
@@ -8,10 +9,12 @@
 
 class QTableView;
 class QLabel;
+class QPoint;
 
 namespace ducq {
 
 class ResultModel;
+class ResultProxyModel;
 
 struct ResultTab {
     int sessionId = 0;
@@ -19,6 +22,7 @@ struct ResultTab {
     int number = 0; // stable display number, used for retranslation
     QString sql;
     ResultModel *model = nullptr;
+    ResultProxyModel *proxy = nullptr;
     QTableView *view = nullptr;
     QLabel *statusLabel = nullptr;
     bool finished = false;
@@ -45,7 +49,7 @@ public:
     // truth for the display cap); totalRows comes from the engine.
     void markFinished(quint64 queryId, qint64 elapsedMs, qsizetype totalRows, bool cancelled, const QString &error);
     const ResultTab *currentTab() const;
-    void clearFinished();
+    void closeCurrentTab();
     void closeSessionTabs(int sessionId);
     void retranslateUi();
     // Re-applies theme-dependent colors to the per-tab status lines.
@@ -54,6 +58,12 @@ public:
 private:
     void renderStatus(ResultTab *tab);
     ResultTab *tabFor(quint64 queryId);
+    // Closes and deletes the tab at index, whatever its state.
+    void removeTabAt(int index);
+    void showContextMenu(const QPoint &globalPos);
+    // Clipboard helpers: text of one cell (NULL becomes empty) and TSV.
+    QString cellText(const ResultTab *tab, const QModelIndex &index) const;
+    void copySelection(bool withHeaders);
 
     QHash<quint64, ResultTab *> m_tabs;
     QHash<QWidget *, ResultTab *> m_tabsByWidget;

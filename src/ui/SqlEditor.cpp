@@ -131,6 +131,18 @@ void SqlEditor::setPlainText(const QString &text)
     m_editor->setPlainText(text);
 }
 
+void SqlEditor::replaceText(const QString &text)
+{
+    // Replace through a cursor instead of setPlainText so the change lands on
+    // the undo stack: generated SQL can be undone back to what was typed.
+    QTextCursor cursor = m_editor->textCursor();
+    cursor.beginEditBlock();
+    cursor.select(QTextCursor::Document);
+    cursor.insertText(text);
+    cursor.endEditBlock();
+    m_editor->setTextCursor(cursor);
+}
+
 QString SqlEditor::toPlainText() const
 {
     return m_editor->toPlainText();

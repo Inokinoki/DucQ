@@ -114,7 +114,7 @@ void MainWindow::buildUi()
     m_historyCombo->setEnabled(false);
     connect(m_historyCombo, &QComboBox::activated, this, [this](int index) {
         if (index >= 0 && index < m_history.size())
-            m_editor->setPlainText(m_history.at(index));
+            m_editor->replaceText(m_history.at(index));
     });
 
     m_runButton = new QPushButton;
@@ -154,7 +154,7 @@ void MainWindow::buildUi()
     connect(m_resultTabs, &QTabWidget::currentChanged, this, [this](int) { updateBusyIndicator(); });
 
     connect(m_schemaTree, &SchemaTree::tableActivated, this, [this](const QString &qualifiedName) {
-        m_editor->setPlainText(QStringLiteral("SELECT * FROM %1 LIMIT 100;").arg(qualifiedName));
+        m_editor->replaceText(QStringLiteral("SELECT * FROM %1 LIMIT 100;").arg(qualifiedName));
     });
     connect(m_schemaTree, &SchemaTree::columnActivated, this, [this](const QString &columnName) {
         m_editor->editorWidget()->insertPlainText(quoteIdentifier(columnName));
@@ -163,8 +163,10 @@ void MainWindow::buildUi()
 
     m_fileMenu = menuBar()->addMenu(QString());
     m_newAction = m_fileMenu->addAction(QString());
+    m_newAction->setShortcut(QKeySequence::New);
     connect(m_newAction, &QAction::triggered, this, &MainWindow::newDatabaseFile);
     m_openAction = m_fileMenu->addAction(QString());
+    m_openAction->setShortcut(QKeySequence::Open);
     connect(m_openAction, &QAction::triggered, this, [this] { openDatabaseFile(); });
     m_newMemoryAction = m_fileMenu->addAction(QString());
     connect(m_newMemoryAction, &QAction::triggered, this, &MainWindow::newInMemoryConnection);
@@ -172,14 +174,26 @@ void MainWindow::buildUi()
     connect(m_closeConnectionAction, &QAction::triggered, this, &MainWindow::closeConnection);
     m_fileMenu->addSeparator();
     m_exportCsvAction = m_fileMenu->addAction(QString());
+    m_exportCsvAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+E")));
     connect(m_exportCsvAction, &QAction::triggered, this,
             [this] { exportCurrentResult(QStringLiteral("CSV")); });
     m_exportParquetAction = m_fileMenu->addAction(QString());
     connect(m_exportParquetAction, &QAction::triggered, this,
             [this] { exportCurrentResult(QStringLiteral("PARQUET")); });
     m_fileMenu->addSeparator();
+    m_closeTabAction = m_fileMenu->addAction(QString());
+    m_closeTabAction->setShortcut(QKeySequence::Close);
+    connect(m_closeTabAction, &QAction::triggered, this,
+            [this] { m_resultTabs->closeCurrentTab(); });
+    m_fileMenu->addSeparator();
     m_quitAction = m_fileMenu->addAction(QString());
+    m_quitAction->setShortcut(QKeySequence::Quit);
     connect(m_quitAction, &QAction::triggered, this, &MainWindow::close);
+
+    m_queryMenu = menuBar()->addMenu(QString());
+    m_runAction = m_queryMenu->addAction(QString());
+    m_runAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+Return")));
+    connect(m_runAction, &QAction::triggered, this, &MainWindow::runEditorSql);
 
     auto *toolbar = addToolBar(QStringLiteral("main"));
     toolbar->setMovable(false);
@@ -187,6 +201,7 @@ void MainWindow::buildUi()
     toolbar->addAction(m_newAction);
     toolbar->addSeparator();
     m_refreshToolbarAction = toolbar->addAction(QString());
+    m_refreshToolbarAction->setShortcut(QKeySequence::Refresh);
     connect(m_refreshToolbarAction, &QAction::triggered, this, &MainWindow::refreshCatalog);
 
     m_connectionLabel = new QLabel(this);
@@ -325,7 +340,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::retranslateUi()
 {
-    m_runButton->setText(tr("Run (Ctrl+⏎)"));
+    m_runButton->setText(tr("Run"));
+    m_runButton->setToolTip(tr("Run the SQL (Ctrl+⏎)"));
     m_sessionCombo->setToolTip(tr("Active connection"));
     m_historyCombo->setToolTip(tr("Query history"));
 
@@ -336,7 +352,10 @@ void MainWindow::retranslateUi()
     m_closeConnectionAction->setText(tr("Close Connection"));
     m_exportCsvAction->setText(tr("Export Current Results as CSV…"));
     m_exportParquetAction->setText(tr("Export Current Results as Parquet…"));
+    m_closeTabAction->setText(tr("Close Result Tab"));
     m_quitAction->setText(tr("Exit"));
+    m_queryMenu->setTitle(tr("&Query"));
+    m_runAction->setText(tr("&Run SQL"));
     m_languageMenu->setTitle(tr("&Language"));
     m_refreshToolbarAction->setText(tr("Refresh Schema"));
 
@@ -515,9 +534,7 @@ void MainWindow::updateConnectionLabel()
         setWindowTitle(QStringLiteral("DucQ"));
         return;
     }
-    const QString name = m_activeSession->isInMemory()
-        ? tr("In-memory database")
-        : QFileInfo(m_activeSession->path()).fileName();
+    const QString name = displayNameFor(m_activeSession);
     m_connectionLabel->setText(name);
     setWindowTitle(QStringLiteral("DucQ — %1").arg(name));
 }

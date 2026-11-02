@@ -38,6 +38,9 @@ public:
 
     QPlainTextEdit *editorWidget() const { return m_editor; }
     void setPlainText(const QString &text);
+    // Replaces the document while keeping the undo stack, so generated SQL
+    // (history, table double-click) can be undone back to the typed text.
+    void replaceText(const QString &text);
     QString toPlainText() const;
     // Selected text, if any (used to run only the selection).
     QString selectedText() const;

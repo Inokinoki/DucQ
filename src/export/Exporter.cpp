@@ -1,16 +1,9 @@
 #include "Exporter.h"
 
+#include "core/Catalog.h"
+
 namespace ducq {
 namespace Exporter {
-namespace {
-
-QString escapeSingleQuoted(QString value)
-{
-    value.replace(QLatin1Char('\''), QStringLiteral("''"));
-    return value;
-}
-
-} // namespace
 
 QString buildCopySql(QString querySql, const QString &filePath, const QString &format)
 {

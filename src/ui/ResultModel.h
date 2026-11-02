@@ -2,6 +2,7 @@
 
 #include <QAbstractTableModel>
 #include <QColor>
+#include <QSortFilterProxyModel>
 
 #include "core/ResultCache.h"
 
@@ -30,6 +31,21 @@ public:
 
 private:
     qsizetype m_displayRowLimit;
+};
+
+// Click-to-sort proxy over a ResultModel: numeric columns compare as
+// numbers, text case-insensitively, NULLs always last (ascending).
+class ResultProxyModel : public QSortFilterProxyModel {
+    Q_OBJECT
+public:
+    using QSortFilterProxyModel::QSortFilterProxyModel;
+
+    // Positional row numbers; the proxy default maps back to source rows,
+    // which reads like data once the view is sorted.
+    QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
+
+protected:
+    bool lessThan(const QModelIndex &left, const QModelIndex &right) const override;
 };
 
 } // namespace ducq

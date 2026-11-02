@@ -70,4 +70,35 @@ void ResultModel::resetEmpty()
     endResetModel();
 }
 
+QVariant ResultProxyModel::headerData(int section, Qt::Orientation orientation, int role) const
+{
+    // Positional row numbers; the proxy default maps back to source rows,
+    // which reads like data once the view is sorted.
+    if (orientation == Qt::Vertical && role == Qt::DisplayRole)
+        return section + 1;
+    return QSortFilterProxyModel::headerData(section, orientation, role);
+}
+
+bool ResultProxyModel::lessThan(const QModelIndex &left, const QModelIndex &right) const
+{
+    const auto *model = qobject_cast<const ResultModel *>(sourceModel());
+    if (!model)
+        return QSortFilterProxyModel::lessThan(left, right);
+    const int column = left.column();
+    const auto &columns = model->cache.columns();
+    const bool numeric = column >= 0 && column < columns.size() && columns.at(column).numeric;
+    const bool leftNull = model->cache.isNull(left.row(), column);
+    const bool rightNull = model->cache.isNull(right.row(), column);
+    if (leftNull || rightNull) {
+        if (leftNull && rightNull)
+            return false;
+        return rightNull; // NULLs last (ascending; proxies invert for descending)
+    }
+    const QVariant leftValue = model->cache.cell(left.row(), column);
+    const QVariant rightValue = model->cache.cell(right.row(), column);
+    if (numeric)
+        return leftValue.toDouble() < rightValue.toDouble();
+    return leftValue.toString().compare(rightValue.toString(), Qt::CaseInsensitive) < 0;
+}
+
 } // namespace ducq

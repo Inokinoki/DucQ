@@ -108,6 +108,7 @@ private:
     QSplitter *m_verticalSplitter = nullptr;
 
     QMenu *m_fileMenu = nullptr;
+    QMenu *m_queryMenu = nullptr;
     QMenu *m_viewMenu = nullptr;
     QMenu *m_themeMenu = nullptr;
     QMenu *m_languageMenu = nullptr;
@@ -119,7 +120,9 @@ private:
     QAction *m_closeConnectionAction = nullptr;
     QAction *m_exportCsvAction = nullptr;
     QAction *m_exportParquetAction = nullptr;
+    QAction *m_closeTabAction = nullptr;
     QAction *m_quitAction = nullptr;
+    QAction *m_runAction = nullptr;
     QAction *m_refreshToolbarAction = nullptr;
     QAction *m_themeSystemAction = nullptr;
     QAction *m_themeLightAction = nullptr;

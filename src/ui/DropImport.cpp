@@ -17,12 +17,6 @@ QString readerForSuffix(const QString &suffix)
     return QString();
 }
 
-QString escapeSingleQuoted(QString value)
-{
-    value.replace(QLatin1Char('\''), QStringLiteral("''"));
-    return value;
-}
-
 } // namespace
 
 bool isSupportedFile(const QString &filePath)

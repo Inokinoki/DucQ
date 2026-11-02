@@ -31,6 +31,13 @@ inline QString quoteIdentifier(const QString &name)
     return QLatin1Char('"') + escaped + QLatin1Char('"');
 }
 
+// Doubles single quotes so text can be embedded in a SQL '...' literal.
+inline QString escapeSingleQuoted(QString value)
+{
+    value.replace(QLatin1Char('\''), QStringLiteral("''"));
+    return value;
+}
+
 } // namespace ducq
 
 Q_DECLARE_METATYPE(ducq::TableInfo)
