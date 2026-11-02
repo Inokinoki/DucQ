@@ -562,7 +562,9 @@ void MainWindow::exportCurrentResult(const QString &format)
 
 void MainWindow::runEditorSql()
 {
-    const QString sql = m_editor->toPlainText().trimmed();
+    // With a selection, run just the selected statements; otherwise all SQL.
+    const QString selection = m_editor->selectedText();
+    const QString sql = (selection.isEmpty() ? m_editor->toPlainText() : selection).trimmed();
     if (sql.isEmpty()) {
         setStatusMessage(tr("No SQL to execute"));
         return;
