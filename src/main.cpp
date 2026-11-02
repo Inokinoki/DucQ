@@ -60,12 +60,10 @@ int main(int argc, char *argv[])
     parser.addOption(executeOption);
     parser.process(app);
 
-    ducq::MainWindow window;
+    const QStringList positional = parser.positionalArguments();
+    ducq::MainWindow window(positional.isEmpty() ? QString() : positional.first());
     window.show();
 
-    const QStringList positional = parser.positionalArguments();
-    if (!positional.isEmpty())
-        window.openDatabaseFileAtStartup(positional.first());
     const QString script = parser.value(executeOption);
     if (!script.isEmpty())
         window.executeScriptAtStartup(script);

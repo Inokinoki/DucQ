@@ -15,6 +15,7 @@ A cross-platform [DuckDB](https://duckdb.org) desktop client — pure C++ / Qt W
 ## Features
 
 - Open / create `.duckdb` database files; an in-memory database works out of the box
+- Multiple simultaneous connections, each with its own worker thread — switch via the selector next to Run (SQL-level `ATTACH` works too)
 - Schema tree: tables / views / columns grouped by schema, double-click to generate a `SELECT`
 - SQL editor: keyword / string / comment highlighting, `Ctrl+Enter` to execute
 - Result table: virtualized rendering, shows the first 1,000,000 rows by default (marked "truncated" beyond that)

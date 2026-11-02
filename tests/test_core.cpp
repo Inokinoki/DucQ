@@ -2,6 +2,7 @@
 
 #include "core/Catalog.h"
 #include "core/Database.h"
+#include "core/DbSession.h"
 #include "core/QueryRunner.h"
 #include "core/ResultCache.h"
 
@@ -26,6 +27,7 @@ private slots:
     void testCancel();
     void testCatalog();
     void testFileDatabasePersistence();
+    void testTwoSessions();
 
 private:
     void runAndWait(const QString &sql, qsizetype displayRowLimit = kDefaultDisplayRowLimit);
@@ -263,6 +265,48 @@ void TestCore::testFileDatabasePersistence()
     }
 
     QFile::remove(path);
+}
+
+void TestCore::testTwoSessions()
+{
+    // Two independent sessions, each with its own worker thread: queries run
+    // concurrently and results are attributed to the right session.
+    DbSession sessionA(1);
+    DbSession sessionB(2);
+    QString error;
+    QVERIFY(sessionA.runner() == nullptr); // the runner only exists after open()
+    QVERIFY2(sessionA.open(QString(), &error), qPrintable(error));
+    QVERIFY(sessionA.runner() != nullptr);
+    QVERIFY2(sessionB.open(QString(), &error), qPrintable(error));
+
+    quint64 doneA = 0;
+    quint64 doneB = 0;
+    qint64 valueA = -1;
+    qint64 valueB = -1;
+    connect(sessionA.runner(), &QueryRunner::resultReady, &sessionA,
+            [&doneA, &valueA](quint64, quintptr resultPtr, const QVector<ducq::ColumnMeta> &columns) {
+                ResultCache cache;
+                cache.reset(reinterpret_cast<duckdb_result *>(resultPtr), columns, kDefaultDisplayRowLimit);
+                valueA = cache.cell(0, 0).toLongLong();
+                doneA = 1;
+            });
+    connect(sessionB.runner(), &QueryRunner::resultReady, &sessionB,
+            [&doneB, &valueB](quint64, quintptr resultPtr, const QVector<ducq::ColumnMeta> &columns) {
+                ResultCache cache;
+                cache.reset(reinterpret_cast<duckdb_result *>(resultPtr), columns, kDefaultDisplayRowLimit);
+                valueB = cache.cell(0, 0).toLongLong();
+                doneB = 1;
+            });
+
+    sessionA.runSql(++m_nextQueryId, QStringLiteral("SELECT 41;"));
+    sessionB.runSql(++m_nextQueryId, QStringLiteral("SELECT 42;"));
+    QTRY_COMPARE_WITH_TIMEOUT(doneA, quint64(1), 30000);
+    QTRY_COMPARE_WITH_TIMEOUT(doneB, quint64(1), 30000);
+    QCOMPARE(valueA, 41);
+    QCOMPARE(valueB, 42);
+
+    sessionA.close();
+    sessionB.close();
 }
 
 QTEST_GUILESS_MAIN(TestCore)

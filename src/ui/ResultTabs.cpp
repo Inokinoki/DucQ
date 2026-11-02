@@ -30,9 +30,10 @@ ResultTabs::ResultTabs(qsizetype displayRowLimit, QWidget *parent)
     });
 }
 
-void ResultTabs::startQueryTab(quint64 queryId, const QString &sql)
+void ResultTabs::startQueryTab(int sessionId, quint64 queryId, const QString &sql)
 {
     auto *tab = new ResultTab;
+    tab->sessionId = sessionId;
     tab->queryId = queryId;
     tab->number = ++m_counter;
     tab->sql = sql;
@@ -88,10 +89,11 @@ ResultTab *ResultTabs::tabFor(quint64 queryId)
     return m_tabs.value(queryId);
 }
 
-bool ResultTabs::deliverResult(quint64 queryId, quintptr resultPtr, const QVector<ColumnMeta> &columns)
+bool ResultTabs::deliverResult(int sessionId, quint64 queryId, quintptr resultPtr,
+                               const QVector<ColumnMeta> &columns)
 {
     ResultTab *tab = tabFor(queryId);
-    if (!tab)
+    if (!tab || tab->sessionId != sessionId)
         return false;
     tab->model->onResult(resultPtr, columns);
     return true;
@@ -141,6 +143,20 @@ void ResultTabs::clearFinished()
     for (int i = count() - 1; i >= 0; --i) {
         if (ResultTab *tab = m_tabsByWidget.value(widget(i))) {
             if (tab->finished) {
+                m_tabs.remove(tab->queryId);
+                m_tabsByWidget.remove(widget(i));
+                removeTab(i);
+                delete tab;
+            }
+        }
+    }
+}
+
+void ResultTabs::closeSessionTabs(int sessionId)
+{
+    for (int i = count() - 1; i >= 0; --i) {
+        if (ResultTab *tab = m_tabsByWidget.value(widget(i))) {
+            if (tab->sessionId == sessionId) {
                 m_tabs.remove(tab->queryId);
                 m_tabsByWidget.remove(widget(i));
                 removeTab(i);

@@ -121,6 +121,7 @@ set(DUCQ_CORE_SOURCES
     src/core/StaticExtensions.cpp
     src/core/AppSettings.cpp
     src/core/Database.cpp
+    src/core/DbSession.cpp
     src/core/ResultCache.cpp
     src/core/QueryRunner.cpp
     src/core/Catalog.cpp)

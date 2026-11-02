@@ -343,6 +343,42 @@ T = {
     # Identical in every language; recorded so the script marks them finished.
     "CSV (*.csv)": {},
     "Parquet (*.parquet)": {},
+    "Active connection": {
+        "zh_CN": "当前连接", "ja": "アクティブな接続", "ko": "활성 연결",
+        "de": "Aktive Verbindung", "fr": "Connexion active", "es": "Conexión activa",
+        "pt_BR": "Conexão ativa", "ru": "Активное подключение",
+    },
+    "Already open in another connection: %1": {
+        "zh_CN": "已在其他连接中打开：%1",
+        "ja": "別の接続で既に開かれています: %1",
+        "ko": "다른 연결에서 이미 열려 있음: %1",
+        "de": "Bereits in einer anderen Verbindung geöffnet: %1",
+        "fr": "Déjà ouvert dans une autre connexion : %1",
+        "es": "Ya abierto en otra conexión: %1",
+        "pt_BR": "Já aberto em outra conexão: %1",
+        "ru": "Уже открыто в другом подключении: %1",
+    },
+    "Cannot read script: %1": {
+        "zh_CN": "无法读取脚本：%1",
+        "ja": "スクリプトを読み取れません: %1",
+        "ko": "스크립트를 읽을 수 없습니다: %1",
+        "de": "Skript kann nicht gelesen werden: %1",
+        "fr": "Impossible de lire le script : %1",
+        "es": "No se pudo leer el script: %1",
+        "pt_BR": "Não foi possível ler o script: %1",
+        "ru": "Не удалось прочитать скрипт: %1",
+    },
+    "Close Connection": {
+        "zh_CN": "关闭连接", "ja": "接続を閉じる", "ko": "연결 닫기",
+        "de": "Verbindung schließen", "fr": "Fermer la connexion",
+        "es": "Cerrar la conexión", "pt_BR": "Fechar a conexão", "ru": "Закрыть подключение",
+    },
+    "New In-Memory Connection": {
+        "zh_CN": "新建内存连接", "ja": "新規インメモリ接続", "ko": "새 인메모리 연결",
+        "de": "Neue In-Memory-Verbindung", "fr": "Nouvelle connexion en mémoire",
+        "es": "Nueva conexión en memoria", "pt_BR": "Nova conexão em memória",
+        "ru": "Новое подключение в памяти",
+    },
 }
 
 LANGS = ["zh_CN", "ja", "ko", "de", "fr", "es", "pt_BR", "ru"]

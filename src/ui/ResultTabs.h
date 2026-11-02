@@ -14,6 +14,7 @@ namespace ducq {
 class ResultModel;
 
 struct ResultTab {
+    int sessionId = 0;
     quint64 queryId = 0;
     int number = 0; // stable display number, used for retranslation
     QString sql;
@@ -35,15 +36,17 @@ class ResultTabs : public QTabWidget {
 public:
     explicit ResultTabs(qsizetype displayRowLimit, QWidget *parent = nullptr);
 
-    void startQueryTab(quint64 queryId, const QString &sql);
-    // Takes ownership of resultPtr when a live tab exists; returns false
-    // otherwise so the caller can destroy it.
-    bool deliverResult(quint64 queryId, quintptr resultPtr, const QVector<ducq::ColumnMeta> &columns);
+    void startQueryTab(int sessionId, quint64 queryId, const QString &sql);
+    // Takes ownership of resultPtr when a live tab exists (matching session
+    // and query); returns false otherwise so the caller can destroy it.
+    bool deliverResult(int sessionId, quint64 queryId, quintptr resultPtr,
+                       const QVector<ducq::ColumnMeta> &columns);
     // Displayed-row counts come from the tab's ResultCache (single source of
     // truth for the display cap); totalRows comes from the engine.
     void markFinished(quint64 queryId, qint64 elapsedMs, qsizetype totalRows, bool cancelled, const QString &error);
     const ResultTab *currentTab() const;
     void clearFinished();
+    void closeSessionTabs(int sessionId);
     void retranslateUi();
 
 private:

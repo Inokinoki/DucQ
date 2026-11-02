@@ -6,11 +6,10 @@
 #include "SqlEditor.h"
 #include "core/AppSettings.h"
 #include "core/Catalog.h"
+#include "core/DbSession.h"
 #include "core/QueryRunner.h"
 #include "core/ResultCache.h"
 #include "export/Exporter.h"
-
-#include <memory>
 
 #include <QActionGroup>
 #include <QApplication>
@@ -37,6 +36,8 @@
 #include <QTranslator>
 #include <QUrl>
 #include <QVBoxLayout>
+
+#include <memory>
 
 namespace ducq {
 namespace {
@@ -67,7 +68,7 @@ QString translationResourcePath(const QString &code)
 
 } // namespace
 
-MainWindow::MainWindow()
+MainWindow::MainWindow(const QString &startupDatabase)
 {
     qRegisterMetaType<QVector<ducq::ColumnMeta>>("QVector<ducq::ColumnMeta>");
     qRegisterMetaType<QVector<ducq::TableInfo>>("QVector<ducq::TableInfo>");
@@ -79,67 +80,24 @@ MainWindow::MainWindow()
     buildUi();
     m_translator = new QTranslator(this);
     buildLanguageMenu();
+
+    // The first session: the startup database file if given, else in-memory.
+    createSession(startupDatabase);
+    activateSession(m_activeSession);
+
     retranslateUi();
-
-    m_workerThread = new QThread(this);
-    m_runner = new QueryRunner(&m_database); // no parent: lives in the worker
-    m_runner->moveToThread(m_workerThread);
-    connectRunner();
-    m_workerThread->start();
-
-    // Start with an in-memory database so the app is usable immediately.
-    QString error;
-    if (!m_database.open(QString(), false, &error)) {
-        QMessageBox::critical(this, QStringLiteral("DucQ"),
-                              tr("Failed to initialize the in-memory database: %1").arg(error));
-        close();
-        return;
-    }
-    QMetaObject::invokeMethod(m_runner, "initialize", Qt::BlockingQueuedConnection);
-    updateConnectionLabel();
     refreshCatalog();
 }
 
-MainWindow::~MainWindow()
-{
-    if (m_workerThread) {
-        m_workerThread->quit();
-        m_workerThread->wait();
-    }
-    delete m_runner; // thread stopped, safe to delete from here
-}
-
-void MainWindow::openDatabaseFileAtStartup(const QString &path)
-{
-    QMetaObject::invokeMethod(m_runner, "shutdown", Qt::BlockingQueuedConnection);
-    QString error;
-    if (!m_database.open(path, false, &error)) {
-        QMessageBox::critical(this, tr("Open Failed"), error);
-        m_database.open(QString(), false, nullptr);
-    }
-    QMetaObject::invokeMethod(m_runner, "initialize", Qt::BlockingQueuedConnection);
-    updateConnectionLabel();
-    refreshCatalog();
-}
-
-void MainWindow::executeScriptAtStartup(const QString &scriptPath)
-{
-    QFile scriptFile(scriptPath);
-    if (!scriptFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        setStatusMessage(tr("Cannot read script: %1").arg(scriptPath));
-        return;
-    }
-    const QString sql = QString::fromUtf8(scriptFile.readAll());
-    m_editor->setPlainText(sql);
-    runSql(sql);
-    pushHistory(sql);
-}
+MainWindow::~MainWindow() = default;
 
 void MainWindow::buildUi()
 {
     m_schemaTree = new SchemaTree;
     m_editor = new SqlEditor;
     m_resultTabs = new ResultTabs(kDefaultDisplayRowLimit);
+    m_sessionCombo = new QComboBox;
+    connect(m_sessionCombo, &QComboBox::activated, this, &MainWindow::switchSession);
     m_historyCombo = new QComboBox;
     m_historyCombo->setMinimumContentsLength(40);
     m_historyCombo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
@@ -149,16 +107,15 @@ void MainWindow::buildUi()
             m_editor->setPlainText(m_history.at(index));
     });
 
-    auto *runButton = new QPushButton;
-    connect(runButton, &QPushButton::clicked, this, &MainWindow::runEditorSql);
+    m_runButton = new QPushButton;
+    connect(m_runButton, &QPushButton::clicked, this, &MainWindow::runEditorSql);
     connect(m_editor, &SqlEditor::executeRequested, this, &MainWindow::runEditorSql);
-    runButton->setObjectName(QStringLiteral("runButton"));
-    m_runButton = runButton;
 
     auto *editorBar = new QWidget;
     auto *editorBarLayout = new QHBoxLayout(editorBar);
     editorBarLayout->setContentsMargins(6, 4, 6, 4);
-    editorBarLayout->addWidget(runButton);
+    editorBarLayout->addWidget(m_runButton);
+    editorBarLayout->addWidget(m_sessionCombo, 0);
     editorBarLayout->addWidget(m_historyCombo, 1);
 
     auto *editorPane = new QWidget;
@@ -195,9 +152,11 @@ void MainWindow::buildUi()
     m_newAction = m_fileMenu->addAction(QString());
     connect(m_newAction, &QAction::triggered, this, &MainWindow::newDatabaseFile);
     m_openAction = m_fileMenu->addAction(QString());
-    connect(m_openAction, &QAction::triggered, this, &MainWindow::openDatabaseFile);
-    m_closeAction = m_fileMenu->addAction(QString());
-    connect(m_closeAction, &QAction::triggered, this, &MainWindow::closeDatabase);
+    connect(m_openAction, &QAction::triggered, this, [this] { openDatabaseFile(); });
+    m_newMemoryAction = m_fileMenu->addAction(QString());
+    connect(m_newMemoryAction, &QAction::triggered, this, &MainWindow::newInMemoryConnection);
+    m_closeConnectionAction = m_fileMenu->addAction(QString());
+    connect(m_closeConnectionAction, &QAction::triggered, this, &MainWindow::closeConnection);
     m_fileMenu->addSeparator();
     m_exportCsvAction = m_fileMenu->addAction(QString());
     connect(m_exportCsvAction, &QAction::triggered, this,
@@ -287,12 +246,14 @@ void MainWindow::changeEvent(QEvent *event)
 void MainWindow::retranslateUi()
 {
     m_runButton->setText(tr("Run (Ctrl+⏎)"));
+    m_sessionCombo->setToolTip(tr("Active connection"));
     m_historyCombo->setToolTip(tr("Query history"));
 
     m_fileMenu->setTitle(tr("&File"));
     m_newAction->setText(tr("New Database…"));
     m_openAction->setText(tr("Open Database…"));
-    m_closeAction->setText(tr("Close Database (back to in-memory)"));
+    m_newMemoryAction->setText(tr("New In-Memory Connection"));
+    m_closeConnectionAction->setText(tr("Close Connection"));
     m_exportCsvAction->setText(tr("Export Current Results as CSV…"));
     m_exportParquetAction->setText(tr("Export Current Results as Parquet…"));
     m_quitAction->setText(tr("Exit"));
@@ -300,20 +261,78 @@ void MainWindow::retranslateUi()
     m_refreshToolbarAction->setText(tr("Refresh Schema"));
 
     m_cancelButton->setText(tr("Cancel"));
+    for (DbSession *session : m_sessions) {
+        const int index = m_sessionCombo->findData(session->id());
+        if (index >= 0)
+            m_sessionCombo->setItemText(index, displayNameFor(session));
+    }
     updateConnectionLabel();
 }
 
-void MainWindow::connectRunner()
+DbSession *MainWindow::createSession(const QString &path)
 {
-    connect(m_runner, &QueryRunner::resultReady, this, &MainWindow::onResultReady);
-    connect(m_runner, &QueryRunner::finished, this, &MainWindow::onQueryFinished);
-    connect(m_runner, &QueryRunner::progressChanged, this, &MainWindow::onProgressChanged);
-    connect(m_runner, &QueryRunner::catalogReady, this, &MainWindow::onCatalogReady);
+    auto *session = new DbSession(m_nextSessionId++, this);
+    QString error;
+    if (!session->open(path, &error)) {
+        QMessageBox::critical(this, tr("Open Failed"), error);
+        delete session;
+        return nullptr;
+    }
+    // The runner only exists once the session is open.
+    connect(session->runner(), &QueryRunner::resultReady, this,
+            [this, session](quint64 qid, quintptr resultPtr, const QVector<ducq::ColumnMeta> &columns) {
+                onResultReady(session->id(), qid, resultPtr, columns);
+            });
+    connect(session->runner(), &QueryRunner::finished, this,
+            [this, session](quint64 qid, qint64 elapsedMs, qsizetype totalRows, bool cancelled,
+                            const QString &error) {
+                onQueryFinished(session->id(), qid, elapsedMs, totalRows, cancelled, error);
+            });
+    connect(session->runner(), &QueryRunner::progressChanged, this,
+            [this, session](quint64, double percentage) {
+                onProgressChanged(session->id(), percentage);
+            });
+    connect(session->runner(), &QueryRunner::catalogReady, this,
+            [this, session](const QVector<ducq::TableInfo> &tables) {
+                onCatalogReady(session->id(), tables);
+            });
+
+    m_sessions.append(session);
+    m_sessionCombo->addItem(displayNameFor(session), session->id());
+    return session;
 }
 
-bool MainWindow::ensureNotBusy()
+void MainWindow::activateSession(DbSession *session)
 {
-    if (m_pendingQueries == 0)
+    if (!session)
+        return;
+    m_activeSession = session;
+    const int index = m_sessionCombo->findData(session->id());
+    if (index >= 0)
+        m_sessionCombo->setCurrentIndex(index);
+    updateConnectionLabel();
+    refreshCatalog();
+}
+
+QString MainWindow::displayNameFor(DbSession *session) const
+{
+    if (session->isInMemory())
+        return tr("In-memory database");
+    return QFileInfo(session->path()).fileName();
+}
+
+DbSession *MainWindow::sessionById(int sessionId) const
+{
+    for (DbSession *session : m_sessions) {
+        if (session->id() == sessionId)
+            return session;
+    }
+    return nullptr;
+}
+
+bool MainWindow::ensureSessionIdle(DbSession *session)
+{
+    if (!session || !session->isBusy())
         return true;
     QMessageBox::information(this, QStringLiteral("DucQ"),
                              tr("A query is running. Wait for it to finish or cancel it first."));
@@ -322,8 +341,6 @@ bool MainWindow::ensureNotBusy()
 
 void MainWindow::newDatabaseFile()
 {
-    if (!ensureNotBusy())
-        return;
     QFileDialog dialog(this, tr("New DuckDB Database"));
     dialog.setAcceptMode(QFileDialog::AcceptSave);
     dialog.setOption(QFileDialog::DontConfirmOverwrite);
@@ -334,64 +351,92 @@ void MainWindow::newDatabaseFile()
     const QStringList files = dialog.selectedFiles();
     if (files.isEmpty())
         return;
-    openDatabase(files.first());
+    openDatabaseFile(files.first());
 }
 
 void MainWindow::openDatabaseFile()
 {
-    if (!ensureNotBusy())
-        return;
-    const QString file =
-        QFileDialog::getOpenFileName(this, tr("Open DuckDB Database"), QString(),
-                                     tr("DuckDB databases (*.duckdb *.db *.ddb);;All files (*)"));
+    const QString file = QFileDialog::getOpenFileName(this, tr("Open DuckDB Database"), QString(),
+                                                      tr("DuckDB databases (*.duckdb *.db *.ddb);;All files (*)"));
     if (!file.isEmpty())
-        openDatabase(file);
+        openDatabaseFile(file);
 }
 
-void MainWindow::closeDatabase()
+void MainWindow::openDatabaseFile(const QString &file)
 {
-    if (!ensureNotBusy())
-        return;
-    openDatabase(QString());
-}
-
-void MainWindow::openDatabase(const QString &path)
-{
-    QMetaObject::invokeMethod(m_runner, "shutdown", Qt::BlockingQueuedConnection);
-    QString error;
-    if (!m_database.open(path, false, &error)) {
-        QMessageBox::critical(this, tr("Open Failed"), error);
-        m_database.open(QString(), false, nullptr);
+    // Reuse an existing connection to the same file instead of opening a
+    // second one (DuckDB allows only one writer per file).
+    const QString absolute = QFileInfo(file).absoluteFilePath();
+    for (DbSession *session : m_sessions) {
+        if (!session->isInMemory() && QFileInfo(session->path()).absoluteFilePath() == absolute) {
+            activateSession(session);
+            setStatusMessage(tr("Already open in another connection: %1").arg(QFileInfo(file).fileName()));
+            return;
+        }
     }
-    QMetaObject::invokeMethod(m_runner, "initialize", Qt::BlockingQueuedConnection);
-    updateConnectionLabel();
-    refreshCatalog();
+    if (DbSession *session = createSession(file))
+        activateSession(session);
+}
+
+void MainWindow::newInMemoryConnection()
+{
+    if (DbSession *session = createSession(QString()))
+        activateSession(session);
+}
+
+void MainWindow::closeConnection()
+{
+    DbSession *session = m_activeSession;
+    if (!session || !ensureSessionIdle(session))
+        return;
+    m_resultTabs->closeSessionTabs(session->id());
+    const int index = m_sessionCombo->findData(session->id());
+    if (index >= 0)
+        m_sessionCombo->removeItem(index);
+    m_sessions.removeOne(session);
+    session->deleteLater();
+    m_activeSession = nullptr;
+
+    if (m_sessions.isEmpty()) {
+        // Never leave the app without a database: fall back to in-memory.
+        if (DbSession *fresh = createSession(QString()))
+            activateSession(fresh);
+        return;
+    }
+    activateSession(m_sessions.last());
+}
+
+void MainWindow::switchSession(int comboIndex)
+{
+    const int sessionId = m_sessionCombo->itemData(comboIndex).toInt();
+    if (DbSession *session = sessionById(sessionId); session && session != m_activeSession)
+        activateSession(session);
 }
 
 void MainWindow::updateConnectionLabel()
 {
-    if (!m_database.isOpen()) {
+    if (!m_activeSession) {
         m_connectionLabel->setText(tr("Not connected"));
+        setWindowTitle(QStringLiteral("DucQ"));
         return;
     }
-    if (m_database.isInMemory())
-        m_connectionLabel->setText(tr("In-memory database"));
-    else
-        m_connectionLabel->setText(m_database.path());
-    setWindowTitle(QStringLiteral("DucQ — %1").arg(m_database.isInMemory()
-                                                       ? tr("In-memory database")
-                                                       : QFileInfo(m_database.path()).fileName()));
+    const QString name = m_activeSession->isInMemory()
+        ? tr("In-memory database")
+        : QFileInfo(m_activeSession->path()).fileName();
+    m_connectionLabel->setText(name);
+    setWindowTitle(QStringLiteral("DucQ — %1").arg(name));
 }
 
 void MainWindow::exportCurrentResult(const QString &format)
 {
-    if (!ensureNotBusy())
-        return;
     const ResultTab *tab = m_resultTabs->currentTab();
     if (!tab || !tab->finished || tab->sql.isEmpty()) {
         QMessageBox::information(this, tr("Export"), tr("Select a finished result tab first."));
         return;
     }
+    DbSession *session = sessionById(tab->sessionId);
+    if (!session)
+        return;
     const QString filter =
         format == QLatin1String("PARQUET") ? tr("Parquet (*.parquet)") : tr("CSV (*.csv)");
     QString file = QFileDialog::getSaveFileName(this, tr("Export Results"), QString(), filter);
@@ -400,7 +445,7 @@ void MainWindow::exportCurrentResult(const QString &format)
     QFileInfo info(file);
     if (info.suffix().isEmpty())
         file += format == QLatin1String("PARQUET") ? QStringLiteral(".parquet") : QStringLiteral(".csv");
-    runSql(Exporter::buildCopySql(tab->sql, file, format));
+    runOnSession(session, Exporter::buildCopySql(tab->sql, file, format));
 }
 
 void MainWindow::runEditorSql()
@@ -410,30 +455,23 @@ void MainWindow::runEditorSql()
         setStatusMessage(tr("No SQL to execute"));
         return;
     }
-    runSql(sql);
+    runOnSession(m_activeSession, sql);
     pushHistory(sql);
 }
 
-void MainWindow::runSql(const QString &sql, const QString &followUpSql)
+void MainWindow::runOnSession(DbSession *session, const QString &sql, const QString &followUpSql)
 {
-    if (!m_database.isOpen()) {
-        QString error;
-        if (!m_database.open(QString(), false, &error)) {
-            QMessageBox::critical(this, QStringLiteral("DucQ"), error);
-            return;
-        }
-        QMetaObject::invokeMethod(m_runner, "initialize", Qt::BlockingQueuedConnection);
-        updateConnectionLabel();
-    }
+    if (!session)
+        return;
     const quint64 queryId = m_nextQueryId++;
     if (!followUpSql.isEmpty())
         m_followUps.insert(queryId, followUpSql);
-    m_resultTabs->startQueryTab(queryId, sql);
-    ++m_pendingQueries;
+    m_resultTabs->startQueryTab(session->id(), queryId, sql);
+    ++m_busyCount;
+    m_lastStartedSid = session->id();
     setBusy(true);
     setStatusMessage(tr("Running…"));
-    QMetaObject::invokeMethod(m_runner, "execute", Qt::QueuedConnection, Q_ARG(quint64, queryId),
-                              Q_ARG(QString, sql));
+    session->runSql(queryId, sql);
 }
 
 void MainWindow::pushHistory(const QString &sql)
@@ -454,27 +492,30 @@ void MainWindow::pushHistory(const QString &sql)
 
 void MainWindow::refreshCatalog()
 {
-    QMetaObject::invokeMethod(m_runner, "refreshCatalog", Qt::QueuedConnection);
+    if (m_activeSession)
+        m_activeSession->refreshCatalog();
 }
 
 void MainWindow::cancelRunningQuery()
 {
-    m_runner->cancel();
+    if (DbSession *session = sessionById(m_lastStartedSid))
+        session->cancel();
 }
 
-void MainWindow::onResultReady(quint64 queryId, quintptr resultPtr, const QVector<ColumnMeta> &columns)
+void MainWindow::onResultReady(int sessionId, quint64 queryId, quintptr resultPtr,
+                               const QVector<ColumnMeta> &columns)
 {
     auto *result = reinterpret_cast<duckdb_result *>(resultPtr);
-    if (!m_resultTabs->deliverResult(queryId, resultPtr, columns))
+    if (!m_resultTabs->deliverResult(sessionId, queryId, resultPtr, columns))
         ResultCache::destroyResult(result);
 }
 
-void MainWindow::onQueryFinished(quint64 queryId, qint64 elapsedMs, qsizetype totalRows, bool cancelled,
-                                 const QString &error)
+void MainWindow::onQueryFinished(int sessionId, quint64 queryId, qint64 elapsedMs, qsizetype totalRows,
+                                 bool cancelled, const QString &error)
 {
-    --m_pendingQueries;
-    if (m_pendingQueries <= 0) {
-        m_pendingQueries = 0;
+    --m_busyCount;
+    if (m_busyCount <= 0) {
+        m_busyCount = 0;
         setBusy(false);
     }
     m_resultTabs->markFinished(queryId, elapsedMs, totalRows, cancelled, error);
@@ -488,22 +529,26 @@ void MainWindow::onQueryFinished(quint64 queryId, qint64 elapsedMs, qsizetype to
         return;
     }
     setStatusMessage(tr("Done: %L1 rows · %L2 ms").arg(totalRows).arg(elapsedMs));
-    const auto followUp = m_followUps.take(queryId);
-    if (!followUp.isEmpty()) {
-        runSql(followUp);
-        return;
+    if (DbSession *session = sessionById(sessionId)) {
+        const QString followUp = m_followUps.take(queryId);
+        if (!followUp.isEmpty()) {
+            runOnSession(session, followUp);
+            return;
+        }
+        session->refreshCatalog();
     }
-    refreshCatalog();
 }
 
-void MainWindow::onProgressChanged(quint64 queryId, double percentage)
+void MainWindow::onProgressChanged(int sessionId, double percentage)
 {
-    Q_UNUSED(queryId);
+    Q_UNUSED(sessionId);
     m_progressBar->setValue(int(qBound(0.0, percentage, 100.0)));
 }
 
-void MainWindow::onCatalogReady(const QVector<TableInfo> &tables)
+void MainWindow::onCatalogReady(int sessionId, const QVector<TableInfo> &tables)
 {
+    if (!m_activeSession || sessionId != m_activeSession->id())
+        return;
     m_schemaTree->setCatalog(tables);
     setStatusMessage(tr("Schema refreshed: %1 tables/views").arg(tables.size()));
 }
@@ -518,6 +563,19 @@ void MainWindow::setBusy(bool busy)
 void MainWindow::setStatusMessage(const QString &message)
 {
     m_messageLabel->setText(message);
+}
+
+void MainWindow::executeScriptAtStartup(const QString &scriptPath)
+{
+    QFile scriptFile(scriptPath);
+    if (!scriptFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        setStatusMessage(tr("Cannot read script: %1").arg(scriptPath));
+        return;
+    }
+    const QString sql = QString::fromUtf8(scriptFile.readAll());
+    m_editor->setPlainText(sql);
+    runOnSession(m_activeSession, sql);
+    pushHistory(sql);
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event)
@@ -546,7 +604,7 @@ void MainWindow::dropEvent(QDropEvent *event)
             setStatusMessage(tr("Skipped unsupported file: %1").arg(QFileInfo(file).fileName()));
             continue;
         }
-        runSql(viewSql, DropImport::buildPreviewSql(viewName));
+        runOnSession(m_activeSession, viewSql, DropImport::buildPreviewSql(viewName));
         ++imported;
     }
     if (imported > 0)
