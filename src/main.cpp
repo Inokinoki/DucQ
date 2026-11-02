@@ -58,6 +58,14 @@ int main(int argc, char *argv[])
                                      QStringLiteral("Run the SQL script after startup."));
     executeOption.setValueName(QStringLiteral("file"));
     parser.addOption(executeOption);
+    QCommandLineOption screenshotOption(QStringLiteral("screenshot"),
+                                        QStringLiteral("Save a screenshot of the main window to <file>, then exit."),
+                                        QStringLiteral("file"));
+    parser.addOption(screenshotOption);
+    QCommandLineOption screenshotDelayOption(QStringLiteral("screenshot-delay"),
+                                             QStringLiteral("Delay before the screenshot in milliseconds."),
+                                             QStringLiteral("ms"), QStringLiteral("2000"));
+    parser.addOption(screenshotDelayOption);
     parser.process(app);
 
     const QStringList positional = parser.positionalArguments();
@@ -67,6 +75,10 @@ int main(int argc, char *argv[])
     const QString script = parser.value(executeOption);
     if (!script.isEmpty())
         window.executeScriptAtStartup(script);
+
+    if (parser.isSet(screenshotOption))
+        window.scheduleScreenshot(parser.value(screenshotOption),
+                                  parser.value(screenshotDelayOption).toInt());
 
     return QApplication::exec();
 }

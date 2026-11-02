@@ -35,6 +35,9 @@ public:
 
     // Runs the given SQL script in the active session after startup.
     void executeScriptAtStartup(const QString &scriptPath);
+    // Grabs the main window into a PNG after delayMs, then closes the app.
+    // Works on the offscreen platform too, which makes it usable in CI.
+    void scheduleScreenshot(const QString &filePath, int delayMs);
 
 protected:
     void changeEvent(QEvent *event) override;

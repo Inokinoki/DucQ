@@ -31,6 +31,7 @@
 #include <QSettings>
 #include <QSplitter>
 #include <QStatusBar>
+#include <QTimer>
 #include <QThread>
 #include <QToolBar>
 #include <QTranslator>
@@ -82,8 +83,8 @@ MainWindow::MainWindow(const QString &startupDatabase)
     buildLanguageMenu();
 
     // The first session: the startup database file if given, else in-memory.
-    createSession(startupDatabase);
-    activateSession(m_activeSession);
+    if (DbSession *first = createSession(startupDatabase))
+        activateSession(first);
 
     retranslateUi();
     refreshCatalog();
@@ -576,6 +577,16 @@ void MainWindow::executeScriptAtStartup(const QString &scriptPath)
     m_editor->setPlainText(sql);
     runOnSession(m_activeSession, sql);
     pushHistory(sql);
+}
+
+void MainWindow::scheduleScreenshot(const QString &filePath, int delayMs)
+{
+    QTimer::singleShot(qMax(delayMs, 0), this, [this, filePath] {
+        const QPixmap shot = grab();
+        if (!shot.save(filePath))
+            qWarning("DucQ: failed to save screenshot to %s", qPrintable(filePath));
+        close();
+    });
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event)

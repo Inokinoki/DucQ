@@ -50,3 +50,29 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure --timeout 300
+
+      # Launch the real app headless (QT_QPA_PLATFORM=offscreen), run the demo
+      # script and grab the window from inside the process — no display server,
+      # window manager or screen-capture permissions needed.
+      - name: Screenshot smoke
+        working-directory: build
+        shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          case "$RUNNER_OS" in
+            Windows) BIN="./DucQ.exe" ;;
+            macOS)   BIN="./DucQ.app/Contents/MacOS/DucQ" ;;
+            *)       BIN="./DucQ" ;;
+          esac
+          "$BIN" --execute ../scripts/demo.sql --screenshot "ducq-$RUNNER_OS.png" --screenshot-delay 2500
+          test -s "ducq-$RUNNER_OS.png"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.name }}
+          path: build/ducq-*.png
+          if-no-files-found: warn
+          retention-days: 14
