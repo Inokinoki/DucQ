@@ -379,6 +379,144 @@ T = {
         "es": "Nueva conexión en memoria", "pt_BR": "Nova conexão em memória",
         "ru": "Новое подключение в памяти",
     },
+    "Run": {
+        "zh_CN": "执行", "ja": "実行", "ko": "실행", "de": "Ausführen",
+        "fr": "Exécuter", "es": "Ejecutar", "pt_BR": "Executar", "ru": "Запустить",
+    },
+    "Run the SQL (Ctrl+⏎)": {
+        "zh_CN": "执行 SQL (Ctrl+⏎)", "ja": "SQL を実行 (Ctrl+⏎)", "ko": "SQL 실행 (Ctrl+⏎)",
+        "de": "SQL ausführen (Ctrl+⏎)", "fr": "Exécuter le SQL (Ctrl+⏎)",
+        "es": "Ejecutar el SQL (Ctrl+⏎)", "pt_BR": "Executar o SQL (Ctrl+⏎)",
+        "ru": "Запустить SQL (Ctrl+⏎)",
+    },
+    "Close Result Tab": {
+        "zh_CN": "关闭结果页签", "ja": "結果タブを閉じる", "ko": "결과 탭 닫기",
+        "de": "Ergebnis-Tab schließen", "fr": "Fermer l'onglet de résultats",
+        "es": "Cerrar la pestaña de resultados", "pt_BR": "Fechar a aba de resultados",
+        "ru": "Закрыть вкладку результатов",
+    },
+    "&Query": {
+        "zh_CN": "查询(&Q)", "ja": "クエリ(&Q)", "ko": "쿼리(&Q)", "de": "&Abfrage",
+        "fr": "&Requête", "es": "&Consulta", "pt_BR": "&Consulta", "ru": "&Запрос",
+    },
+    "&Run SQL": {
+        "zh_CN": "执行 SQL(&R)", "ja": "SQL を実行(&R)", "ko": "SQL 실행(&R)",
+        "de": "SQL &ausführen", "fr": "Exécuter le &SQL", "es": "&Ejecutar SQL",
+        "pt_BR": "&Executar SQL", "ru": "&Запустить SQL",
+    },
+    "&View": {
+        "zh_CN": "视图(&V)", "ja": "表示(&V)", "ko": "보기(&V)", "de": "&Ansicht",
+        "fr": "&Affichage", "es": "&Ver", "pt_BR": "&Ver", "ru": "&Вид",
+    },
+    "&Theme": {
+        "zh_CN": "主题(&T)", "ja": "テーマ(&T)", "ko": "테마(&T)", "de": "&Design",
+        "fr": "&Thème", "es": "&Tema", "pt_BR": "&Tema", "ru": "&Тема",
+    },
+    "Follow System": {
+        "zh_CN": "跟随系统", "ja": "システムに従う", "ko": "시스템 따르기", "de": "System folgen",
+        "fr": "Suivre le système", "es": "Seguir el sistema", "pt_BR": "Seguir o sistema",
+        "ru": "Как в системе",
+    },
+    "Light": {
+        "zh_CN": "浅色", "ja": "ライト", "ko": "라이트", "de": "Hell",
+        "fr": "Clair", "es": "Claro", "pt_BR": "Claro", "ru": "Светлая",
+    },
+    "Dark": {
+        "zh_CN": "深色", "ja": "ダーク", "ko": "다크", "de": "Dunkel",
+        "fr": "Sombre", "es": "Oscuro", "pt_BR": "Escuro", "ru": "Тёмная",
+    },
+    "%1 already exists. Open it as an existing database?": {
+        "zh_CN": "%1 已存在。作为现有数据库打开？",
+        "ja": "%1 は既に存在します。既存のデータベースとして開きますか？",
+        "ko": "%1이(가) 이미 있습니다. 기존 데이터베이스로 열까요?",
+        "de": "%1 existiert bereits. Als vorhandene Datenbank öffnen?",
+        "fr": "%1 existe déjà. L'ouvrir comme base de données existante ?",
+        "es": "%1 ya existe. ¿Abrirla como base de datos existente?",
+        "pt_BR": "%1 já existe. Abrir como banco de dados existente?",
+        "ru": "%1 уже существует. Открыть как существующую базу данных?",
+    },
+    "Running — %1": {
+        "zh_CN": "执行中 — %1", "ja": "実行中 — %1", "ko": "실행 중 — %1", "de": "Läuft — %1",
+        "fr": "En cours — %1", "es": "Ejecutando — %1", "pt_BR": "Em execução — %1",
+        "ru": "Выполняется — %1",
+    },
+    "Cancel the running query on %1": {
+        "zh_CN": "取消 %1 上正在执行的查询",
+        "ja": "%1 で実行中のクエリをキャンセル",
+        "ko": "%1에서 실행 중인 쿼리 취소",
+        "de": "Laufende Abfrage auf %1 abbrechen",
+        "fr": "Annuler la requête en cours sur %1",
+        "es": "Cancelar la consulta en curso en %1",
+        "pt_BR": "Cancelar a consulta em andamento em %1",
+        "ru": "Отменить выполняемый запрос на %1",
+    },
+    "Copy Cell": {
+        "zh_CN": "复制单元格", "ja": "セルをコピー", "ko": "셀 복사", "de": "Zelle kopieren",
+        "fr": "Copier la cellule", "es": "Copiar celda", "pt_BR": "Copiar célula",
+        "ru": "Копировать ячейку",
+    },
+    "Copy Row": {
+        "zh_CN": "复制行", "ja": "行をコピー", "ko": "행 복사", "de": "Zeile kopieren",
+        "fr": "Copier la ligne", "es": "Copiar fila", "pt_BR": "Copiar linha",
+        "ru": "Копировать строку",
+    },
+    "Copy Selection": {
+        "zh_CN": "复制所选", "ja": "選択範囲をコピー", "ko": "선택 영역 복사", "de": "Auswahl kopieren",
+        "fr": "Copier la sélection", "es": "Copiar selección", "pt_BR": "Copiar seleção",
+        "ru": "Копировать выделенное",
+    },
+    "Copy Selection with Headers": {
+        "zh_CN": "复制所选（含表头）",
+        "ja": "選択範囲をヘッダー付きでコピー",
+        "ko": "선택 영역 복사(헤더 포함)",
+        "de": "Auswahl mit Kopfzeilen kopieren",
+        "fr": "Copier la sélection avec les en-têtes",
+        "es": "Copiar selección con encabezados",
+        "pt_BR": "Copiar seleção com cabeçalhos",
+        "ru": "Копировать выделенное с заголовками",
+    },
+    "No matches": {
+        "zh_CN": "无匹配", "ja": "該当なし", "ko": "일치 항목 없음", "de": "Keine Treffer",
+        "fr": "Aucun résultat", "es": "Sin coincidencias", "pt_BR": "Nenhuma correspondência",
+        "ru": "Нет совпадений",
+    },
+    "%1 matches": {
+        "zh_CN": "%1 个匹配", "ja": "%1 件一致", "ko": "일치 항목 %1개", "de": "%1 Treffer",
+        "fr": "%1 résultats", "es": "%1 coincidencias", "pt_BR": "%1 correspondências",
+        "ru": "Совпадений: %1",
+    },
+    "Find": {
+        "zh_CN": "查找", "ja": "検索", "ko": "찾기", "de": "Suchen",
+        "fr": "Rechercher", "es": "Buscar", "pt_BR": "Localizar", "ru": "Найти",
+    },
+    "Replace with": {
+        "zh_CN": "替换为", "ja": "置換後の文字列", "ko": "바꿀 내용", "de": "Ersetzen durch",
+        "fr": "Remplacer par", "es": "Reemplazar por", "pt_BR": "Substituir por",
+        "ru": "Заменить на",
+    },
+    "Previous match": {
+        "zh_CN": "上一个匹配", "ja": "前の一致項目", "ko": "이전 일치 항목", "de": "Vorheriger Treffer",
+        "fr": "Résultat précédent", "es": "Coincidencia anterior", "pt_BR": "Correspondência anterior",
+        "ru": "Предыдущее совпадение",
+    },
+    "Next match": {
+        "zh_CN": "下一个匹配", "ja": "次の一致項目", "ko": "다음 일치 항목", "de": "Nächster Treffer",
+        "fr": "Résultat suivant", "es": "Siguiente coincidencia", "pt_BR": "Próxima correspondência",
+        "ru": "Следующее совпадение",
+    },
+    "Replace": {
+        "zh_CN": "替换", "ja": "置換", "ko": "바꾸기", "de": "Ersetzen",
+        "fr": "Remplacer", "es": "Reemplazar", "pt_BR": "Substituir", "ru": "Заменить",
+    },
+    "Replace All": {
+        "zh_CN": "全部替换", "ja": "すべて置換", "ko": "모두 바꾸기", "de": "Alle ersetzen",
+        "fr": "Tout remplacer", "es": "Reemplazar todo", "pt_BR": "Substituir tudo",
+        "ru": "Заменить все",
+    },
+    "Close": {
+        "zh_CN": "关闭", "ja": "閉じる", "ko": "닫기", "de": "Schließen",
+        "fr": "Fermer", "es": "Cerrar", "pt_BR": "Fechar", "ru": "Закрыть",
+    },
 }
 
 LANGS = ["zh_CN", "ja", "ko", "de", "fr", "es", "pt_BR", "ru"]
