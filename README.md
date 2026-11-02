@@ -6,7 +6,16 @@ A cross-platform [DuckDB](https://duckdb.org) desktop client — pure C++ / Qt W
 
 ![DucQ main window](docs/screenshots/main-window.png)
 
-*Schema tree, SQL editor with highlighting, and a virtualized result table — the query above created the `users` table from a `range()` and reads it back.*
+*Schema tree, connection selector, SQL editor with highlighting, and a virtualized result table — the query above created the `users` table from a `range()` and reads it back. These screenshots are captured by CI on every push, headlessly on each platform.*
+
+<details>
+<summary>Windows and Linux builds (same app, same CI pipeline)</summary>
+
+<p>
+  <img src="docs/screenshots/main-window-windows.png" width="45%" alt="DucQ on Windows"> <img src="docs/screenshots/main-window-linux.png" width="45%" alt="DucQ on Linux">
+</p>
+
+</details>
 
 ![DucQ result table with NULLs](docs/screenshots/null-values.png)
 

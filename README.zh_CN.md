@@ -6,7 +6,16 @@
 
 ![DucQ 主窗口](docs/screenshots/main-window.png)
 
-*模式树、SQL 高亮编辑器与虚拟化结果表格 —— 上图中的 `users` 表由 `range()` 直接生成并读回。*
+*模式树、连接选择器、SQL 高亮编辑器与虚拟化结果表格 —— 上图中的 `users` 表由 `range()` 直接生成并读回。截图由 CI 在每次 push 时于各平台无头采集。*
+
+<details>
+<summary>Windows 与 Linux 构建（同一应用、同一 CI 流水线）</summary>
+
+<p>
+  <img src="docs/screenshots/main-window-windows.png" width="45%" alt="DucQ on Windows"> <img src="docs/screenshots/main-window-linux.png" width="45%" alt="DucQ on Linux">
+</p>
+
+</details>
 
 ![DucQ NULL 值展示](docs/screenshots/null-values.png)
 
