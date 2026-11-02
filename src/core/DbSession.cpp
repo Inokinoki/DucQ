@@ -38,6 +38,10 @@ void DbSession::close()
 {
     if (m_runner) {
         if (m_thread && m_thread->isRunning()) {
+            // Interrupt a running query first: the blocking shutdown queues
+            // behind whatever the worker is executing and would otherwise
+            // block this thread until the statement finishes.
+            m_runner->cancel();
             QMetaObject::invokeMethod(m_runner, "shutdown", Qt::BlockingQueuedConnection);
             m_thread->quit();
             m_thread->wait();

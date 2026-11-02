@@ -17,6 +17,7 @@ class QProgressBar;
 class QPushButton;
 class QSplitter;
 class QThread;
+class QToolButton;
 class QTranslator;
 
 namespace ducq {
@@ -102,7 +103,7 @@ private:
     QLabel *m_messageLabel = nullptr;
     QLabel *m_statsLabel = nullptr;
     QProgressBar *m_progressBar = nullptr;
-    QPushButton *m_cancelButton = nullptr;
+    QToolButton *m_cancelButton = nullptr;
     QPushButton *m_runButton = nullptr;
     QSplitter *m_horizontalSplitter = nullptr;
     QSplitter *m_verticalSplitter = nullptr;

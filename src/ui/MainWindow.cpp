@@ -37,6 +37,7 @@
 #include <QTimer>
 #include <QThread>
 #include <QToolBar>
+#include <QToolButton>
 #include <QTranslator>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -210,10 +211,16 @@ void MainWindow::buildUi()
     m_progressBar = new QProgressBar(this);
     m_progressBar->setRange(0, 100);
     m_progressBar->setFixedWidth(160);
+    // A full-height progress bar would inflate the whole status bar.
+    m_progressBar->setFixedHeight(14);
     m_progressBar->setVisible(false);
-    m_cancelButton = new QPushButton(this);
+    // autoRaise tool button: slim like a toolbar item, so the status bar
+    // keeps its height when it appears.
+    m_cancelButton = new QToolButton(this);
+    m_cancelButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_cancelButton->setAutoRaise(true);
     m_cancelButton->setVisible(false);
-    connect(m_cancelButton, &QPushButton::clicked, this, &MainWindow::cancelRunningQuery);
+    connect(m_cancelButton, &QToolButton::clicked, this, &MainWindow::cancelRunningQuery);
 
     statusBar()->addWidget(m_connectionLabel);
     statusBar()->addWidget(m_messageLabel, 1);

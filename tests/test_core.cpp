@@ -31,6 +31,7 @@ private slots:
     void testCatalog();
     void testFileDatabasePersistence();
     void testTwoSessions();
+    void testCloseDuringRunningQuery();
     void testHistoryStore();
 
 private:
@@ -311,6 +312,23 @@ void TestCore::testTwoSessions()
 
     sessionA.close();
     sessionB.close();
+}
+
+void TestCore::testCloseDuringRunningQuery()
+{
+    // Regression: close() queued its blocking shutdown behind the running
+    // statement, so closing a busy session hung until the query finished.
+    // close() must interrupt the query and return promptly.
+    DbSession session(1);
+    QString error;
+    QVERIFY2(session.open(QString(), &error), qPrintable(error));
+    session.runSql(++m_nextQueryId,
+                   QStringLiteral("SELECT count(*) FROM range(300000) a, range(300000) b;"));
+    QElapsedTimer timer;
+    timer.start();
+    session.close();
+    QVERIFY(timer.elapsed() < 10000); // would be minutes without the interrupt
+    QVERIFY(!session.isBusy());
 }
 
 void TestCore::testHistoryStore()

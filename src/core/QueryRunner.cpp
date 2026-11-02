@@ -147,7 +147,9 @@ void QueryRunner::execute(quint64 queryId, const QString &sql)
 {
     QElapsedTimer timer;
     timer.start();
-    m_cancelRequested = false;
+    // m_cancelRequested is deliberately NOT reset here: a cancel() landing
+    // between runSql() and this point must still cancel this query. It is
+    // cleared once this execution is done (see the end of this function).
 
     QString error;
     bool cancelled = false;
@@ -214,6 +216,7 @@ void QueryRunner::execute(quint64 queryId, const QString &sql)
         emit resultReady(queryId, reinterpret_cast<quintptr>(heapResult), shownColumns);
     }
     emit finished(queryId, timer.elapsed(), totalRows, cancelled, error);
+    m_cancelRequested = false;
 }
 
 void QueryRunner::refreshCatalog()
