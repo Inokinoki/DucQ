@@ -3,10 +3,13 @@
 #include "core/Catalog.h"
 #include "core/Database.h"
 #include "core/DbSession.h"
+#include "core/HistoryStore.h"
 #include "core/QueryRunner.h"
 #include "core/ResultCache.h"
 
 #include <QEventLoop>
+#include <QSettings>
+#include <QTemporaryDir>
 #include <QThread>
 
 using namespace ducq;
@@ -28,6 +31,7 @@ private slots:
     void testCatalog();
     void testFileDatabasePersistence();
     void testTwoSessions();
+    void testHistoryStore();
 
 private:
     void runAndWait(const QString &sql, qsizetype displayRowLimit = kDefaultDisplayRowLimit);
@@ -307,6 +311,36 @@ void TestCore::testTwoSessions()
 
     sessionA.close();
     sessionB.close();
+}
+
+void TestCore::testHistoryStore()
+{
+    // Push deduplicates, moves to front, and caps the list.
+    QStringList history;
+    history = HistoryStore::push(history, QStringLiteral("SELECT 1;"));
+    history = HistoryStore::push(history, QStringLiteral("SELECT 2;"));
+    history = HistoryStore::push(history, QStringLiteral("SELECT 1;"));
+    QCOMPARE(history.size(), 2);
+    QCOMPARE(history.first(), QStringLiteral("SELECT 1;"));
+
+    for (int i = 0; i < HistoryStore::kMaxEntries + 5; ++i)
+        history = HistoryStore::push(history, QStringLiteral("SELECT %1;").arg(i));
+    QCOMPARE(history.size(), HistoryStore::kMaxEntries);
+    QCOMPARE(history.first(), QStringLiteral("SELECT %1;").arg(HistoryStore::kMaxEntries + 4));
+
+    // Round-trip through QSettings.
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    {
+        QSettings store(dir.filePath(QStringLiteral("history.ini")), QSettings::IniFormat);
+        HistoryStore::save(&store, history);
+    }
+    QSettings store(dir.filePath(QStringLiteral("history.ini")), QSettings::IniFormat);
+    QCOMPARE(HistoryStore::load(&store), history);
+
+    // Empty history removes the key instead of writing an empty array.
+    HistoryStore::save(&store, QStringList());
+    QVERIFY(HistoryStore::load(&store).isEmpty());
 }
 
 QTEST_GUILESS_MAIN(TestCore)

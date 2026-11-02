@@ -16,6 +16,9 @@ class SqlHighlighter : public QSyntaxHighlighter {
 public:
     explicit SqlHighlighter(QTextDocument *document);
 
+    // Re-reads the theme tokens and re-highlights the document.
+    void retheme();
+
 protected:
     void highlightBlock(const QString &text) override;
 
@@ -36,7 +39,10 @@ public:
     QPlainTextEdit *editorWidget() const { return m_editor; }
     void setPlainText(const QString &text);
     QString toPlainText() const;
+    // Selected text, if any (used to run only the selection).
+    QString selectedText() const;
     void retranslateUi();
+    void retheme();
 
 signals:
     void executeRequested();
@@ -46,6 +52,7 @@ protected:
 
 private:
     QPlainTextEdit *m_editor = nullptr;
+    SqlHighlighter *m_highlighter = nullptr;
 };
 
 } // namespace ducq

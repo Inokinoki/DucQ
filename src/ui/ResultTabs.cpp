@@ -1,6 +1,7 @@
 #include "ResultTabs.h"
 
 #include "ResultModel.h"
+#include "Theme.h"
 
 #include <QFontDatabase>
 #include <QHeaderView>
@@ -116,11 +117,14 @@ void ResultTabs::markFinished(quint64 queryId, qint64 elapsedMs, qsizetype total
 void ResultTabs::renderStatus(ResultTab *tab)
 {
     if (!tab->error.isEmpty()) {
-        tab->statusLabel->setStyleSheet(QStringLiteral("color: #c62828;"));
+        tab->statusLabel->setStyleSheet(
+            QStringLiteral("color: %1;").arg(Theme::tokens().error.name()));
         tab->statusLabel->setText(tab->error);
         return;
     }
-    tab->statusLabel->setStyleSheet(tab->cancelled ? QStringLiteral("color: #b26a00;") : QString());
+    tab->statusLabel->setStyleSheet(tab->cancelled
+        ? QStringLiteral("color: %1;").arg(Theme::tokens().cancelled.name())
+        : QString());
     if (tab->cancelled) {
         tab->statusLabel->setText(tr("Cancelled · %L1 ms").arg(tab->elapsedMs));
         return;
@@ -177,6 +181,11 @@ void ResultTabs::retranslateUi()
                 tab->statusLabel->setText(tr("Running…"));
         }
     }
+}
+
+void ResultTabs::retheme()
+{
+    retranslateUi(); // renderStatus reads the theme tokens at call time
 }
 
 } // namespace ducq

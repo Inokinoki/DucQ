@@ -48,6 +48,8 @@ public:
     void clearFinished();
     void closeSessionTabs(int sessionId);
     void retranslateUi();
+    // Re-applies theme-dependent colors to the per-tab status lines.
+    void retheme();
 
 private:
     void renderStatus(ResultTab *tab);

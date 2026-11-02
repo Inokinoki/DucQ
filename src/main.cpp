@@ -1,4 +1,5 @@
 #include "ui/MainWindow.h"
+#include "ui/Theme.h"
 
 #include "core/AppSettings.h"
 
@@ -66,7 +67,22 @@ int main(int argc, char *argv[])
                                              QStringLiteral("Delay before the screenshot in milliseconds."),
                                              QStringLiteral("ms"), QStringLiteral("2000"));
     parser.addOption(screenshotDelayOption);
+    QCommandLineOption themeOption(QStringLiteral("theme"),
+                                   QStringLiteral("UI theme: system, light or dark."),
+                                   QStringLiteral("mode"), QStringLiteral("system"));
+    parser.addOption(themeOption);
     parser.process(app);
+
+    // Apply before the window is built so widgets start with the right palette.
+    {
+        using namespace ducq::Theme;
+        const QString themeValue = parser.value(themeOption);
+        const Mode mode = themeValue == QLatin1String("light") ? Mode::Light
+            : themeValue == QLatin1String("dark")              ? Mode::Dark
+                                                               : Mode::System;
+        applyTheme(mode);
+        QApplication::setWindowIcon(Icons::appIcon());
+    }
 
     const QStringList positional = parser.positionalArguments();
     ducq::MainWindow window(positional.isEmpty() ? QString() : positional.first());

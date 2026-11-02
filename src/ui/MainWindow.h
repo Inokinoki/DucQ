@@ -41,6 +41,7 @@ public:
 
 protected:
     void changeEvent(QEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dropEvent(QDropEvent *event) override;
 
@@ -66,9 +67,13 @@ private slots:
 
 private:
     void buildUi();
+    void buildViewMenu();
     void buildLanguageMenu();
     void retranslateUi();
     void applyLanguage(const QString &code, bool saveSetting);
+    void switchTheme(QAction *action);
+    void applyIcons();
+    void refreshThemeDependentUi();
 
     DbSession *createSession(const QString &path);
     void activateSession(ducq::DbSession *session);
@@ -76,10 +81,15 @@ private:
     DbSession *sessionById(int sessionId) const;
     QString displayNameFor(ducq::DbSession *session) const;
     bool ensureSessionIdle(ducq::DbSession *session);
-    void runOnSession(ducq::DbSession *session, const QString &sql, const QString &followUpSql = {});
-    void pushHistory(const QString &sql);
+    void runOnSession(ducq::DbSession *session, const QString &sql, const QString &followUpSql = {},
+                      bool recordHistory = false);
+    void updateHistoryCombo();
+    void saveHistory();
     void setStatusMessage(const QString &message);
-    void setBusy(bool busy);
+    void setStatusError(const QString &message);
+    void updateBusyIndicator();
+    void restoreWindowState();
+    void saveWindowState();
     void updateConnectionLabel();
 
     QTranslator *m_translator = nullptr;
@@ -94,10 +104,15 @@ private:
     QProgressBar *m_progressBar = nullptr;
     QPushButton *m_cancelButton = nullptr;
     QPushButton *m_runButton = nullptr;
+    QSplitter *m_horizontalSplitter = nullptr;
+    QSplitter *m_verticalSplitter = nullptr;
 
     QMenu *m_fileMenu = nullptr;
+    QMenu *m_viewMenu = nullptr;
+    QMenu *m_themeMenu = nullptr;
     QMenu *m_languageMenu = nullptr;
     QActionGroup *m_languageGroup = nullptr;
+    QActionGroup *m_themeGroup = nullptr;
     QAction *m_newAction = nullptr;
     QAction *m_openAction = nullptr;
     QAction *m_newMemoryAction = nullptr;
@@ -106,15 +121,23 @@ private:
     QAction *m_exportParquetAction = nullptr;
     QAction *m_quitAction = nullptr;
     QAction *m_refreshToolbarAction = nullptr;
+    QAction *m_themeSystemAction = nullptr;
+    QAction *m_themeLightAction = nullptr;
+    QAction *m_themeDarkAction = nullptr;
 
     QList<ducq::DbSession *> m_sessions;
     ducq::DbSession *m_activeSession = nullptr;
     int m_nextSessionId = 1;
     quint64 m_nextQueryId = 1; // globally unique across sessions
     int m_busyCount = 0;
+    QHash<int, quint64> m_runningQueries; // sessionId -> running queryId
+    int m_busyIndicatorSid = -1;          // session the progress bar / cancel act on
     int m_lastStartedSid = -1;
     QHash<quint64, QString> m_followUps;
+    QHash<quint64, QString> m_pendingHistory; // queryId -> sql, recorded on success
     QStringList m_history;
+    bool m_persistState = true; // off for headless screenshots
+    bool m_statusIsError = false; // re-colored on theme switches
 };
 
 } // namespace ducq

@@ -1,5 +1,7 @@
 #include "ResultModel.h"
 
+#include "Theme.h"
+
 namespace ducq {
 
 ResultModel::ResultModel(qsizetype displayRowLimit, QObject *parent)
@@ -28,7 +30,7 @@ QVariant ResultModel::data(const QModelIndex &index, int role) const
     }
     if (role == Qt::ForegroundRole) {
         if (cache.isNull(index.row(), index.column()))
-            return QColor(0x8a, 0x8f, 0x98);
+            return Theme::tokens().nullText;
         return {};
     }
     if (role == Qt::TextAlignmentRole) {

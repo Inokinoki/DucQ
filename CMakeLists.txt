@@ -122,6 +122,7 @@ set(DUCQ_CORE_SOURCES
     src/core/AppSettings.cpp
     src/core/Database.cpp
     src/core/DbSession.cpp
+    src/core/HistoryStore.cpp
     src/core/ResultCache.cpp
     src/core/QueryRunner.cpp
     src/core/Catalog.cpp)
@@ -133,6 +134,7 @@ add_executable(DucQ WIN32 MACOSX_BUNDLE
     src/ui/MainWindow.cpp src/ui/MainWindow.h
     src/ui/SchemaTree.cpp src/ui/SchemaTree.h
     src/ui/SqlEditor.cpp src/ui/SqlEditor.h
+    src/ui/Theme.cpp src/ui/Theme.h
     src/ui/ResultModel.cpp src/ui/ResultModel.h
     src/ui/ResultTabs.cpp src/ui/ResultTabs.h
     src/ui/DropImport.cpp src/ui/DropImport.h

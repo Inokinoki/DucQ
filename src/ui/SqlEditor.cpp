@@ -1,9 +1,12 @@
 #include "SqlEditor.h"
 
+#include "Theme.h"
+
 #include <QEvent>
 #include <QFontDatabase>
 #include <QKeyEvent>
 #include <QPlainTextEdit>
+#include <QTextCursor>
 #include <QVBoxLayout>
 
 namespace ducq {
@@ -29,10 +32,6 @@ const char *const kKeywords[] = {
 SqlHighlighter::SqlHighlighter(QTextDocument *document)
     : QSyntaxHighlighter(document)
 {
-    QTextCharFormat keywordFormat;
-    keywordFormat.setForeground(QColor(0x05, 0x50, 0xae));
-    keywordFormat.setFontWeight(QFont::Bold);
-
     QString keywordPattern = QStringLiteral("\\b(?:");
     for (const char *keyword : kKeywords) {
         keywordPattern += QLatin1String(keyword);
@@ -41,18 +40,27 @@ SqlHighlighter::SqlHighlighter(QTextDocument *document)
     keywordPattern.chop(1);
     keywordPattern += QStringLiteral(")\\b");
     m_rules.append({ QRegularExpression(keywordPattern, QRegularExpression::CaseInsensitiveOption),
-                     keywordFormat });
+                     QTextCharFormat() });
+    m_rules.append({ QRegularExpression(QStringLiteral("'[^']*'")), QTextCharFormat() });
+    m_rules.append({ QRegularExpression(QStringLiteral("\\b(?:\\d+\\.?\\d*|\\.\\d+)\\b")),
+                     QTextCharFormat() });
+    retheme();
+}
 
-    QTextCharFormat stringFormat;
-    stringFormat.setForeground(QColor(0x0a, 0x7a, 0x2f));
-    m_rules.append({ QRegularExpression(QStringLiteral("'[^']*'")), stringFormat });
+void SqlHighlighter::retheme()
+{
+    const Theme::Tokens &t = Theme::tokens();
 
-    QTextCharFormat numberFormat;
-    numberFormat.setForeground(QColor(0x95, 0x38, 0x00));
-    m_rules.append({ QRegularExpression(QStringLiteral("\\b(?:\\d+\\.?\\d*|\\.\\d+)\\b")), numberFormat });
+    QTextCharFormat &keywordFormat = m_rules[0].format;
+    keywordFormat.setForeground(t.keyword);
+    keywordFormat.setFontWeight(QFont::Bold);
 
-    m_commentFormat.setForeground(QColor(0x6e, 0x77, 0x81));
+    m_rules[1].format.setForeground(t.string);
+    m_rules[2].format.setForeground(t.number);
+
+    m_commentFormat.setForeground(t.comment);
     m_commentFormat.setFontItalic(true);
+    rehighlight();
 }
 
 void SqlHighlighter::highlightBlock(const QString &text)
@@ -84,13 +92,18 @@ SqlEditor::SqlEditor(QWidget *parent)
     m_editor->setTabStopDistance(4 * m_editor->fontMetrics().horizontalAdvance(QLatin1Char(' ')));
     m_editor->installEventFilter(this);
 
-    new SqlHighlighter(m_editor->document());
+    m_highlighter = new SqlHighlighter(m_editor->document());
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->addWidget(m_editor);
 
     retranslateUi();
+}
+
+void SqlEditor::retheme()
+{
+    m_highlighter->retheme();
 }
 
 void SqlEditor::retranslateUi()
@@ -121,6 +134,12 @@ void SqlEditor::setPlainText(const QString &text)
 QString SqlEditor::toPlainText() const
 {
     return m_editor->toPlainText();
+}
+
+QString SqlEditor::selectedText() const
+{
+    QTextCursor cursor = m_editor->textCursor();
+    return cursor.hasSelection() ? cursor.selectedText() : QString();
 }
 
 } // namespace ducq
