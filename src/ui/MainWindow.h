@@ -12,6 +12,7 @@ class QDragEnterEvent;
 class QDropEvent;
 class QActionGroup;
 class QLabel;
+class QLineEdit;
 class QMenu;
 class QProgressBar;
 class QPushButton;
@@ -75,6 +76,8 @@ private:
     void switchTheme(QAction *action);
     void applyIcons();
     void refreshThemeDependentUi();
+    void cycleSession(int direction);
+    void updateCursorPos();
 
     DbSession *createSession(const QString &path);
     void activateSession(ducq::DbSession *session);
@@ -99,9 +102,11 @@ private:
     ResultTabs *m_resultTabs = nullptr;
     QComboBox *m_sessionCombo = nullptr;
     QComboBox *m_historyCombo = nullptr;
+    QLineEdit *m_schemaFilter = nullptr;
     QLabel *m_connectionLabel = nullptr;
     QLabel *m_messageLabel = nullptr;
     QLabel *m_statsLabel = nullptr;
+    QLabel *m_cursorPosLabel = nullptr;
     QProgressBar *m_progressBar = nullptr;
     QToolButton *m_cancelButton = nullptr;
     QPushButton *m_runButton = nullptr;

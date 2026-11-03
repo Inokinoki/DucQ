@@ -23,6 +23,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QLineEdit>
 #include <QLabel>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -32,12 +33,14 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSettings>
+#include <QShortcut>
 #include <QSplitter>
 #include <QStatusBar>
 #include <QTimer>
 #include <QThread>
 #include <QToolBar>
 #include <QToolButton>
+#include <QTextCursor>
 #include <QTranslator>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -105,17 +108,37 @@ MainWindow::~MainWindow() = default;
 void MainWindow::buildUi()
 {
     m_schemaTree = new SchemaTree;
+    m_schemaFilter = new QLineEdit;
+    m_schemaFilter->setClearButtonEnabled(true);
+    m_schemaFilter->setAccessibleName(tr("Filter tables…"));
+    connect(m_schemaFilter, &QLineEdit::textChanged, m_schemaTree, &SchemaTree::setFilter);
+    auto *schemaPane = new QWidget;
+    auto *schemaLayout = new QVBoxLayout(schemaPane);
+    schemaLayout->setContentsMargins(4, 4, 0, 0);
+    schemaLayout->setSpacing(2);
+    schemaLayout->addWidget(m_schemaFilter);
+    schemaLayout->addWidget(m_schemaTree, 1);
+
     m_editor = new SqlEditor;
     m_resultTabs = new ResultTabs(kDefaultDisplayRowLimit);
     m_sessionCombo = new QComboBox;
+    // Size to the longest connection name so large system fonts don't clip
+    // the text; the history combo (stretch=1) absorbs the rest.
+    m_sessionCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    m_sessionCombo->setAccessibleName(tr("Active connection"));
     connect(m_sessionCombo, &QComboBox::activated, this, &MainWindow::switchSession);
     m_historyCombo = new QComboBox;
-    m_historyCombo->setMinimumContentsLength(40);
+    m_historyCombo->setAccessibleName(tr("Query history"));
+    // A large minimum here would squeeze the session combo on narrow windows
+    // or large system fonts; entries stay readable via the popup and tooltip.
+    m_historyCombo->setMinimumContentsLength(20);
     m_historyCombo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
     m_historyCombo->setEnabled(false);
     connect(m_historyCombo, &QComboBox::activated, this, [this](int index) {
-        if (index >= 0 && index < m_history.size())
+        if (index >= 0 && index < m_history.size()) {
             m_editor->replaceText(m_history.at(index));
+            m_historyCombo->setToolTip(m_history.at(index));
+        }
     });
 
     m_runButton = new QPushButton;
@@ -144,7 +167,7 @@ void MainWindow::buildUi()
     m_verticalSplitter->setSizes({280, 480});
 
     m_horizontalSplitter = new QSplitter(Qt::Horizontal);
-    m_horizontalSplitter->addWidget(m_schemaTree);
+    m_horizontalSplitter->addWidget(schemaPane);
     m_horizontalSplitter->addWidget(m_verticalSplitter);
     m_horizontalSplitter->setStretchFactor(0, 1);
     m_horizontalSplitter->setStretchFactor(1, 4);
@@ -208,9 +231,11 @@ void MainWindow::buildUi()
     m_connectionLabel = new QLabel(this);
     m_messageLabel = new QLabel(this);
     m_statsLabel = new QLabel(this);
+    m_cursorPosLabel = new QLabel(this);
+    m_cursorPosLabel->setAccessibleName(tr("Cursor position"));
     m_progressBar = new QProgressBar(this);
     m_progressBar->setRange(0, 100);
-    m_progressBar->setFixedWidth(160);
+    m_progressBar->setFixedWidth(120);
     // A full-height progress bar would inflate the whole status bar.
     m_progressBar->setFixedHeight(14);
     m_progressBar->setVisible(false);
@@ -225,8 +250,17 @@ void MainWindow::buildUi()
     statusBar()->addWidget(m_connectionLabel);
     statusBar()->addWidget(m_messageLabel, 1);
     statusBar()->addPermanentWidget(m_statsLabel);
+    statusBar()->addPermanentWidget(m_cursorPosLabel);
     statusBar()->addPermanentWidget(m_progressBar);
     statusBar()->addPermanentWidget(m_cancelButton);
+
+    // Ctrl+Tab cycles connections; Ctrl+Shift+Tab goes the other way.
+    auto *nextConnectionShortcut = new QShortcut(QKeySequence(QStringLiteral("Ctrl+Tab")), this);
+    connect(nextConnectionShortcut, &QShortcut::activated, this, [this] { cycleSession(1); });
+    auto *prevConnectionShortcut = new QShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+Tab")), this);
+    connect(prevConnectionShortcut, &QShortcut::activated, this, [this] { cycleSession(-1); });
+    connect(m_editor->editorWidget(), &QPlainTextEdit::cursorPositionChanged, this,
+            &MainWindow::updateCursorPos);
 
     // Icons and menus need every widget above to exist first.
     applyIcons();
@@ -289,6 +323,23 @@ void MainWindow::refreshThemeDependentUi()
             QStringLiteral("color: %1;").arg(Theme::tokens().error.name()));
 }
 
+void MainWindow::cycleSession(int direction)
+{
+    const int count = m_sessionCombo->count();
+    if (count < 2)
+        return;
+    const int next = (m_sessionCombo->currentIndex() + direction + count) % count;
+    if (DbSession *session = sessionById(m_sessionCombo->itemData(next).toInt()))
+        activateSession(session);
+}
+
+void MainWindow::updateCursorPos()
+{
+    const QTextCursor cursor = m_editor->editorWidget()->textCursor();
+    m_cursorPosLabel->setText(tr("Ln %L1, Col %L2").arg(cursor.blockNumber() + 1)
+                                  .arg(cursor.positionInBlock() + 1));
+}
+
 void MainWindow::buildLanguageMenu()
 {
     m_languageMenu = menuBar()->addMenu(QString());
@@ -349,8 +400,10 @@ void MainWindow::retranslateUi()
 {
     m_runButton->setText(tr("Run"));
     m_runButton->setToolTip(tr("Run the SQL (Ctrl+⏎)"));
-    m_sessionCombo->setToolTip(tr("Active connection"));
+    m_sessionCombo->setToolTip(tr("Active connection (Ctrl+Tab cycles)"));
     m_historyCombo->setToolTip(tr("Query history"));
+    m_schemaFilter->setPlaceholderText(tr("Filter tables…"));
+    updateCursorPos();
 
     m_fileMenu->setTitle(tr("&File"));
     m_newAction->setText(tr("New Database…"));
@@ -606,6 +659,7 @@ void MainWindow::updateHistoryCombo()
         if (display.size() > 60)
             display = display.left(60) + QStringLiteral("…");
         m_historyCombo->addItem(display);
+        m_historyCombo->setItemData(m_historyCombo->count() - 1, entry, Qt::ToolTipRole);
     }
     m_historyCombo->setEnabled(!m_history.isEmpty());
 }
