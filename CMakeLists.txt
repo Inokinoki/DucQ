@@ -138,7 +138,12 @@ set(DUCKDB_EXT_SOURCES
     httpfs
     excel
     fts
-    vss)
+    vss
+    iceberg
+    ducklake
+    delta
+    mysql_scanner
+    spatial)
 
 # postgres_scanner needs libpq >= 18 (OAuth APIs, e.g. PGoauthBearerRequest).
 # Detect the header and drop postgres gracefully when only an older libpq
@@ -163,6 +168,92 @@ find_package(minizip-ng QUIET CONFIG)
 if(NOT minizip-ng_FOUND)
     message(STATUS "DucQ: minizip-ng not found — building without excel (brew install minizip-ng / vcpkg minizip-ng)")
     list(REMOVE_ITEM DUCKDB_EXT_SOURCES excel)
+endif()
+
+# spatial needs GDAL+PROJ plus the vcpkg-only unofficial-sqlite3 package;
+# synthesize the latter from the system sqlite3 when available.
+find_package(GDAL QUIET CONFIG)
+find_package(PROJ QUIET CONFIG)
+find_path(SQLITE3_INCLUDE_DIR sqlite3.h
+    HINTS /opt/homebrew/opt/sqlite/include /usr/include /usr/local/include)
+find_library(SQLITE3_LIBRARY sqlite3
+    HINTS /opt/homebrew/opt/sqlite/lib /usr/lib /usr/local/lib)
+if(GDAL_FOUND AND PROJ_FOUND AND SQLITE3_INCLUDE_DIR AND SQLITE3_LIBRARY)
+    # The pinned spatial commit targets the vcpkg GDAL 3.8/3.9 VSIVirtualHandle
+    # API; GDAL >= 3.13 changed those signatures (Read/Write overrides no
+    # longer match), and patching them is out of scope. Keep the probe so a
+    # compatible GDAL builds spatial automatically; otherwise skip it.
+    set(SPATIAL_GDAL_COMPATIBLE OFF)
+    if(GDAL_VERSION AND GDAL_VERSION VERSION_LESS "3.13")
+        set(SPATIAL_GDAL_COMPATIBLE ON)
+    endif()
+    if(SPATIAL_GDAL_COMPATIBLE)
+        file(WRITE "${CMAKE_BINARY_DIR}/stubs/unofficial-sqlite3/unofficial-sqlite3Config.cmake" "
+if(NOT TARGET unofficial::sqlite3::sqlite3)
+    add_library(unofficial::sqlite3::sqlite3 UNKNOWN IMPORTED)
+    set_target_properties(unofficial::sqlite3::sqlite3 PROPERTIES
+        IMPORTED_LOCATION \"${SQLITE3_LIBRARY}\"
+        INTERFACE_INCLUDE_DIRECTORIES \"${SQLITE3_INCLUDE_DIR}\")
+endif()
+if(NOT TARGET unofficial::sqlite3)
+    add_library(unofficial::sqlite3 INTERFACE IMPORTED)
+    target_link_libraries(unofficial::sqlite3 INTERFACE unofficial::sqlite3::sqlite3)
+endif()
+")
+        list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/stubs/unofficial-sqlite3")
+        message(STATUS "DucQ: GDAL ${GDAL_VERSION} compatible — enabling spatial")
+    else()
+        message(STATUS "DucQ: GDAL ${GDAL_VERSION} incompatible with pinned spatial (needs < 3.13) — skipping spatial")
+        list(REMOVE_ITEM DUCKDB_EXT_SOURCES spatial)
+    endif()
+else()
+    message(STATUS "DucQ: GDAL/PROJ/sqlite3 incomplete — building without spatial (brew install gdal)")
+    list(REMOVE_ITEM DUCKDB_EXT_SOURCES spatial)
+endif()
+
+# mysql_scanner discovers libmariadb through the vcpkg-only
+# unofficial-libmariadb package. Probe a system libmariadb (the extension
+# includes plain "mysql.h": Homebrew keeps it in include/mariadb/) and
+# synthesize that config so the upstream find_package chain resolves; skip
+# mysql when absent.
+find_path(MARIADB_INCLUDE_DIR mysql.h
+    HINTS /opt/homebrew/opt/mariadb-connector-c/include/mariadb
+    PATHS /usr/include/mariadb /usr/local/include/mariadb
+          /usr/include/mysql /usr/local/include/mysql /opt/homebrew/include/mysql)
+find_library(MARIADB_LIBRARY mariadb
+    HINTS /opt/homebrew/opt/mariadb-connector-c/lib /usr/lib /usr/local/lib)
+if(MARIADB_INCLUDE_DIR AND MARIADB_LIBRARY)
+    # mysql_catalog.cpp / mysql_schema_entry.cpp define un-namespaced free
+    # helpers (GetSecret, CatalogTypeIsSupported) that postgres' copies of the
+    # same code also define — fine for separate loadables, a collision when
+    # statically co-linked. Rename them; definitions and calls are file-local.
+    foreach(_srcfile mysql_catalog.cpp mysql_schema_entry.cpp)
+        set(_patch_target "${CMAKE_BINARY_DIR}/_deps/mysql_scanner_extension_fc-src/src/storage/${_srcfile}")
+        if(EXISTS "${_patch_target}")
+            file(READ "${_patch_target}" _patch_content)
+            string(REPLACE "GetSecret(" "MySQLGetSecret(" _patch_content "${_patch_content}")
+            string(REPLACE "CatalogTypeIsSupported(" "MySQLCatalogTypeIsSupported("
+                           _patch_content "${_patch_content}")
+            file(WRITE "${_patch_target}" "${_patch_content}")
+        endif()
+    endforeach()
+    # mysql_scanner hardcodes include_directories(<build>/vcpkg_installed/<triplet>/include/mysql);
+    # outside vcpkg the triplet is empty, so materialize the headers there.
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/vcpkg_installed/include/mysql")
+    file(COPY ${MARIADB_INCLUDE_DIR}/ DESTINATION "${CMAKE_BINARY_DIR}/vcpkg_installed/include/mysql")
+    file(WRITE "${CMAKE_BINARY_DIR}/stubs/unofficial-libmariadb/unofficial-libmariadbConfig.cmake" "
+if(NOT TARGET unofficial::libmariadb)
+    add_library(unofficial::libmariadb UNKNOWN IMPORTED)
+    set_target_properties(unofficial::libmariadb PROPERTIES
+        IMPORTED_LOCATION \"${MARIADB_LIBRARY}\"
+        INTERFACE_INCLUDE_DIRECTORIES \"${MARIADB_INCLUDE_DIR}\")
+endif()
+")
+    list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/stubs/unofficial-libmariadb")
+    message(STATUS "DucQ: libmariadb found — enabling mysql_scanner (${MARIADB_LIBRARY})")
+else()
+    message(STATUS "DucQ: libmariadb not found — building without mysql_scanner")
+    list(REMOVE_ITEM DUCKDB_EXT_SOURCES mysql_scanner)
 endif()
 FetchContent_Declare(duckdb_ext
     GIT_REPOSITORY "https://github.com/duckdb/duckdb.git"
@@ -190,10 +281,74 @@ FetchContent_MakeAvailable(duckdb_ext)
 # Link the extension targets directly — output paths and build order come
 # from CMake. MinGW's upstream config skips postgres, so check per target.
 foreach(_name IN LISTS DUCKDB_EXT_SOURCES)
-    if(TARGET ${_name}_extension)
+    # mysql_scanner never produces a <name>_extension target (v1-style CMake
+    # only builds the loadable); its packed archive is handled below via
+    # mysql_scanner_pack.
+    if(_name STREQUAL "mysql_scanner" AND NOT TARGET mysql_scanner_loadable_extension)
+        message(STATUS "DucQ: remote-db extension ${_name} not built (skipped)")
+        continue()
+    endif()
+    if(TARGET ${_name}_extension OR _name STREQUAL "mysql_scanner")
         message(STATUS "DucQ: linking remote-db extension ${_name}")
-        target_link_libraries(duckdb_bundle INTERFACE ${_name}_extension)
-        if(_name STREQUAL "postgres_scanner")
+        # mysql gets a bespoke packed archive below; everything else links as
+        # built (the mysql source rename removes the only static-collision).
+        if(NOT _name STREQUAL "mysql_scanner")
+            target_link_libraries(duckdb_bundle INTERFACE ${_name}_extension)
+        endif()
+        if(_name STREQUAL "mysql_scanner")
+            # This pinned mysql_scanner has v1-style CMake: it only builds the
+            # loadable .duckdb_extension, never a static archive, so static
+            # registration is impossible out of the box. Pack its objects into
+            # an archive ourselves and hand-write the describe entry (the same
+            # shape duckdb's own codegen produces for the other extensions).
+            file(GLOB_RECURSE MYSQL_OBJS_ALL
+                "${duckdb_ext_BINARY_DIR}/extension/mysql_scanner/*.o")
+            # The shared database-connector archive (from postgres) covers
+            # these; keeping mysql's copies would collide with it.
+            set(MYSQL_OBJS "")
+            foreach(_o IN LISTS MYSQL_OBJS_ALL)
+                if(NOT _o MATCHES "/dbconnector/")
+                    list(APPEND MYSQL_OBJS "${_o}")
+                endif()
+            endforeach()
+            set(MYSQL_PACK "${CMAKE_BINARY_DIR}/stubs/libmysql_scanner_extension.a")
+            file(WRITE "${CMAKE_BINARY_DIR}/stubs/mysql_scanner_describe.c" "
+// Hand-written for the mysql_scanner static pack (see CMakeLists.txt).
+#include \"duckdb_static_extension.h\"
+
+void mysql_scanner_duckdb_cpp_init(void *loader);
+
+#ifdef __cplusplus
+extern \"C\" {
+#endif
+
+int32_t duckdb_extension_mysql_scanner_describe(duckdb_extension_descriptor *descriptor) {
+	if (descriptor->version < 1) {
+		descriptor->set_error(descriptor, \"extension mysql_scanner needs descriptor layout 1\");
+		return 1;
+	}
+	descriptor->version = 1;
+	descriptor->name = \"mysql_scanner\";
+	descriptor->extension_version = \"f7fc0d4271\";
+	descriptor->api_version = \"d54cbbe3df\";
+	descriptor->entry_cpp = (void (*)(void))mysql_scanner_duckdb_cpp_init;
+	return 0;
+}
+
+#ifdef __cplusplus
+}
+#endif
+")
+            add_custom_command(OUTPUT "${MYSQL_PACK}"
+                COMMAND /usr/bin/cc -c "${CMAKE_BINARY_DIR}/stubs/mysql_scanner_describe.c"
+                        -o "${CMAKE_BINARY_DIR}/stubs/mysql_scanner_describe.o"
+                        -I"${duckdb_headers_SOURCE_DIR}" -I"${duckdb_libs_SOURCE_DIR}"
+                COMMAND ar rcs "${MYSQL_PACK}"
+                        "${CMAKE_BINARY_DIR}/stubs/mysql_scanner_describe.o" ${MYSQL_OBJS}
+                DEPENDS mysql_scanner_loadable_extension)
+            add_custom_target(mysql_scanner_pack DEPENDS "${MYSQL_PACK}")
+            target_link_libraries(duckdb_bundle INTERFACE "${MYSQL_PACK}" "${MARIADB_LIBRARY}")
+        elseif(_name STREQUAL "postgres_scanner")
             # The scanner links libpq/OpenSSL PRIVATEly, so the final binary
             # must pick them up itself.
             find_package(OpenSSL QUIET)
@@ -282,3 +437,10 @@ else()
     target_compile_options(test_core PRIVATE -Wall -Wextra)
 endif()
 add_test(NAME test_core COMMAND test_core)
+
+if(TARGET mysql_scanner_pack)
+    # The packed mysql archive is produced by a custom command; make the
+    # final binaries wait for it.
+    add_dependencies(DucQ mysql_scanner_pack)
+    add_dependencies(test_core mysql_scanner_pack)
+endif()

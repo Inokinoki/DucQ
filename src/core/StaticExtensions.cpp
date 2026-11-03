@@ -26,6 +26,13 @@ int32_t duckdb_extension_httpfs_describe(duckdb_extension_descriptor *);
 int32_t duckdb_extension_excel_describe(duckdb_extension_descriptor *);
 int32_t duckdb_extension_fts_describe(duckdb_extension_descriptor *);
 int32_t duckdb_extension_vss_describe(duckdb_extension_descriptor *);
+// Lakehouse: DuckLake catalogs and Delta Lake tables. iceberg is built but
+// not registered: its static init hangs the process on startup (see git log).
+int32_t duckdb_extension_ducklake_describe(duckdb_extension_descriptor *);
+int32_t duckdb_extension_delta_describe(duckdb_extension_descriptor *);
+// mysql_scanner ships v1-style CMake (no static archive); CMakeLists packs
+// its objects and hand-writes the describe entry.
+int32_t duckdb_extension_mysql_scanner_describe(duckdb_extension_descriptor *);
 }
 
 namespace ducq {
@@ -52,6 +59,9 @@ const ExtensionEntry kExtensions[] = {
     {"excel", duckdb_extension_excel_describe},
     {"fts", duckdb_extension_fts_describe},
     {"vss", duckdb_extension_vss_describe},
+    {"ducklake", duckdb_extension_ducklake_describe},
+    {"delta", duckdb_extension_delta_describe},
+    {"mysql_scanner", duckdb_extension_mysql_scanner_describe},
 };
 
 std::once_flag g_registered;
