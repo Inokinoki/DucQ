@@ -41,10 +41,10 @@ Tokens lightTokens()
     t.string = QColor(0x0a, 0x7a, 0x2f);
     t.number = QColor(0x95, 0x38, 0x00);
     t.comment = QColor(0x6e, 0x77, 0x81);
-    // semantic feedback
-    t.nullText = QColor(0x8a, 0x8f, 0x98);
+    // semantic feedback (all pairs WCAG AA on base/alternate/window)
+    t.nullText = QColor(0x65, 0x6d, 0x76);
     t.error = QColor(0xc6, 0x28, 0x28);
-    t.cancelled = QColor(0xb2, 0x6a, 0x00);
+    t.cancelled = QColor(0x9e, 0x6a, 0x03);
     t.success = QColor(0x1a, 0x7f, 0x37);
     // surfaces
     t.currentLine = QColor(0xea, 0xee, 0xf2);
@@ -63,7 +63,7 @@ Tokens darkTokens()
     t.text = QColor(0xe6, 0xed, 0xf3);
     t.buttonText = t.text;
     t.windowText = t.text;
-    t.placeholder = QColor(0x7d, 0x85, 0x90);
+    t.placeholder = QColor(0x8b, 0x94, 0x9e);
     t.highlight = QColor(0x31, 0x6d, 0xca);
     t.highlightedText = QColor(0xff, 0xff, 0xff);
     t.link = QColor(0x58, 0xa6, 0xff);
@@ -75,9 +75,9 @@ Tokens darkTokens()
     t.string = QColor(0x7e, 0xe7, 0x87);
     t.number = QColor(0xff, 0xa6, 0x57);
     t.comment = QColor(0x8b, 0x94, 0x9e);
-    // semantic feedback
+    // semantic feedback (all pairs WCAG AA on base/alternate/window)
     t.nullText = QColor(0x8b, 0x94, 0x9e);
-    t.error = QColor(0xf8, 0x51, 0x49);
+    t.error = QColor(0xff, 0x7b, 0x72);
     t.cancelled = QColor(0xd2, 0x99, 0x22);
     t.success = QColor(0x3f, 0xb9, 0x50);
     // surfaces
@@ -280,6 +280,54 @@ QIcon iconAtSizes(Icon which, const QColor &color)
 QIcon actionIcon(Icon which)
 {
     return iconAtSizes(which, tokens().text);
+}
+
+QIcon statusIcon(Status status)
+{
+    return drawGlyph([status](QPainter &p) {
+        const QPointF center(8, 8);
+        switch (status) {
+        case Status::Running:
+            // Hollow ring: the query is still going.
+            p.setPen(glyphPen(tokens().text, 1.5));
+            p.setBrush(Qt::NoBrush);
+            p.drawEllipse(center, 3.5, 3.5);
+            break;
+        case Status::Ok: {
+            // Green dot with a check mark: colour + shape carry the state.
+            p.setPen(Qt::NoPen);
+            p.setBrush(tokens().success);
+            p.drawEllipse(center, 4, 4);
+            QPainterPath check;
+            check.moveTo(5.6, 8.1);
+            check.lineTo(7.3, 9.8);
+            check.lineTo(10.5, 6.4);
+            p.setPen(glyphPen(Qt::white, 1.4));
+            p.setBrush(Qt::NoBrush);
+            p.drawPath(check);
+            break;
+        }
+        case Status::Error: {
+            // Red dot with an X.
+            p.setPen(Qt::NoPen);
+            p.setBrush(tokens().error);
+            p.drawEllipse(center, 4, 4);
+            p.setPen(glyphPen(Qt::white, 1.4));
+            p.drawLine(QPointF(6.2, 6.2), QPointF(9.8, 9.8));
+            p.drawLine(QPointF(9.8, 6.2), QPointF(6.2, 9.8));
+            break;
+        }
+        case Status::Cancelled: {
+            // Amber dot with a dash.
+            p.setPen(Qt::NoPen);
+            p.setBrush(tokens().cancelled);
+            p.drawEllipse(center, 4, 4);
+            p.setPen(glyphPen(Qt::white, 1.4));
+            p.drawLine(QPointF(5.8, 8), QPointF(10.2, 8));
+            break;
+        }
+        }
+    }, 16);
 }
 
 QIcon appIcon()

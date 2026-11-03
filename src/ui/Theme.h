@@ -48,6 +48,10 @@ QIcon actionIcon(Icon which);
 // Fixed-color app icon (rounded accent square with a duck silhouette).
 QIcon appIcon();
 
+enum class Status { Running, Ok, Error, Cancelled };
+// Small dot/ring glyphs marking a result tab's query state.
+QIcon statusIcon(Status status);
+
 } // namespace Icons
 
 } // namespace Theme
