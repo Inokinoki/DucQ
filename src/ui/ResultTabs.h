@@ -10,6 +10,8 @@
 class QTableView;
 class QLabel;
 class QPoint;
+class QEvent;
+class QResizeEvent;
 
 namespace ducq {
 
@@ -21,6 +23,7 @@ struct ResultTab {
     quint64 queryId = 0;
     int number = 0; // stable display number, used for retranslation
     QString sql;
+    QWidget *page = nullptr;
     ResultModel *model = nullptr;
     ResultProxyModel *proxy = nullptr;
     QTableView *view = nullptr;
@@ -55,6 +58,10 @@ public:
     // Re-applies theme-dependent colors to the per-tab status lines.
     void retheme();
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
+
 private:
     void renderStatus(ResultTab *tab);
     ResultTab *tabFor(quint64 queryId);
@@ -64,11 +71,17 @@ private:
     // Clipboard helpers: text of one cell (NULL becomes empty) and TSV.
     QString cellText(const ResultTab *tab, const QModelIndex &index) const;
     void copySelection(bool withHeaders);
+    // Running / ok / error / cancelled glyph and SQL preview in the tab title.
+    void updateTabIcon(ResultTab *tab);
+    void updateTabToolTip(ResultTab *tab);
+    // Shows/hides the accessible empty-state label.
+    void updateEmptyState();
 
     QHash<quint64, ResultTab *> m_tabs;
     QHash<QWidget *, ResultTab *> m_tabsByWidget;
     qsizetype m_displayRowLimit;
     int m_counter = 0;
+    QLabel *m_emptyLabel = nullptr;
 };
 
 } // namespace ducq

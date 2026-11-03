@@ -5,14 +5,17 @@
 
 #include <QApplication>
 #include <QClipboard>
+#include <QEvent>
 #include <QFontDatabase>
 #include <QGuiApplication>
 #include <QHeaderView>
 #include <QItemSelectionModel>
 #include <QLabel>
 #include <QMenu>
+#include <QMouseEvent>
 #include <QShortcut>
 #include <QTableView>
+#include <QTimer>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -41,6 +44,41 @@ ResultTabs::ResultTabs(qsizetype displayRowLimit, QWidget *parent)
     setTabsClosable(true);
     setMovable(true);
     connect(this, &QTabWidget::tabCloseRequested, this, [this](int index) { removeTabAt(index); });
+    // Middle-click also closes the tab under the cursor.
+    tabBar()->installEventFilter(this);
+
+    // Empty-state hint as a real label: exposed to accessibility APIs,
+    // unlike painted text. It never intercepts mouse or drop events.
+    m_emptyLabel = new QLabel(this);
+    m_emptyLabel->setAlignment(Qt::AlignCenter);
+    m_emptyLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+    m_emptyLabel->setStyleSheet(
+        QStringLiteral("color: %1;").arg(Theme::tokens().placeholder.name()));
+    m_emptyLabel->hide();
+
+    retranslateUi(); // initializes the empty-state hint
+}
+
+bool ResultTabs::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == tabBar() && event->type() == QEvent::MouseButtonPress) {
+        auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        if (mouseEvent->button() == Qt::MiddleButton) {
+            const int index = tabBar()->tabAt(mouseEvent->pos());
+            if (index >= 0) {
+                // Deferred so the tab bar finishes handling the press first.
+                QTimer::singleShot(0, this, [this, index] { removeTabAt(index); });
+                return true;
+            }
+        }
+    }
+    return QTabWidget::eventFilter(watched, event);
+}
+
+void ResultTabs::resizeEvent(QResizeEvent *event)
+{
+    QTabWidget::resizeEvent(event);
+    m_emptyLabel->setGeometry(rect());
 }
 
 void ResultTabs::startQueryTab(int sessionId, quint64 queryId, const QString &sql)
@@ -54,6 +92,7 @@ void ResultTabs::startQueryTab(int sessionId, quint64 queryId, const QString &sq
     tab->model = new ResultModel(m_displayRowLimit, page);
     tab->proxy = new ResultProxyModel(page);
     tab->proxy->setSourceModel(tab->model);
+    tab->page = page;
     tab->proxy->setSortCaseSensitivity(Qt::CaseInsensitive);
     tab->view = new QTableView(page);
     tab->view->setModel(tab->proxy);
@@ -86,8 +125,11 @@ void ResultTabs::startQueryTab(int sessionId, quint64 queryId, const QString &sq
 
     const int index = addTab(page, tr("Result %1").arg(tab->number));
     setCurrentIndex(index);
+    updateTabIcon(tab);
+    updateTabToolTip(tab);
     m_tabs.insert(queryId, tab);
     m_tabsByWidget.insert(page, tab);
+    updateEmptyState();
 
     // Keep the tab bar from growing without bounds.
     int finishedCount = 0;
@@ -132,6 +174,7 @@ void ResultTabs::markFinished(quint64 queryId, qint64 elapsedMs, qsizetype total
     tab->elapsedMs = elapsedMs;
     tab->totalRows = totalRows;
     renderStatus(tab);
+    updateTabIcon(tab);
 }
 
 void ResultTabs::renderStatus(ResultTab *tab)
@@ -177,9 +220,11 @@ void ResultTabs::removeTabAt(int index)
         m_tabsByWidget.remove(page);
         removeTab(index);
         delete tab;
+        updateEmptyState();
         return;
     }
     removeTab(index);
+    updateEmptyState();
 }
 
 void ResultTabs::closeSessionTabs(int sessionId)
@@ -289,17 +334,55 @@ void ResultTabs::retranslateUi()
     for (int i = 0; i < count(); ++i) {
         if (ResultTab *tab = m_tabsByWidget.value(widget(i))) {
             setTabText(i, tr("Result %1").arg(tab->number));
+            updateTabToolTip(tab);
             if (tab->finished)
                 renderStatus(tab);
             else
                 tab->statusLabel->setText(tr("Running…"));
         }
     }
+    m_emptyLabel->setText(tr("Run a query (Ctrl+⏎) to see results here"));
+    updateEmptyState();
 }
 
 void ResultTabs::retheme()
 {
     retranslateUi(); // renderStatus reads the theme tokens at call time
+    m_emptyLabel->setStyleSheet(QStringLiteral("color: %1;").arg(Theme::tokens().placeholder.name()));
+    for (ResultTab *tab : m_tabs)
+        updateTabIcon(tab);
+}
+
+void ResultTabs::updateEmptyState()
+{
+    m_emptyLabel->setVisible(count() == 0);
+}
+
+void ResultTabs::updateTabIcon(ResultTab *tab)
+{
+    const int index = indexOf(tab->page);
+    if (index < 0)
+        return;
+    using Status = Theme::Icons::Status;
+    if (!tab->finished)
+        setTabIcon(index, Theme::Icons::statusIcon(Status::Running));
+    else if (!tab->error.isEmpty())
+        setTabIcon(index, Theme::Icons::statusIcon(Status::Error));
+    else if (tab->cancelled)
+        setTabIcon(index, Theme::Icons::statusIcon(Status::Cancelled));
+    else
+        setTabIcon(index, Theme::Icons::statusIcon(Status::Ok));
+}
+
+void ResultTabs::updateTabToolTip(ResultTab *tab)
+{
+    const int index = indexOf(tab->page);
+    if (index < 0)
+        return;
+    QString preview = tab->sql.simplified();
+    if (preview.size() > 300)
+        preview = preview.left(300) + QStringLiteral("…");
+    setTabToolTip(index, preview);
 }
 
 } // namespace ducq
