@@ -18,7 +18,9 @@ SchemaTree::SchemaTree(QWidget *parent)
     setAlternatingRowColors(true);
     setContextMenuPolicy(Qt::CustomContextMenu);
     connect(this, &QTreeWidget::customContextMenuRequested, this, &SchemaTree::showContextMenu);
-    connect(this, &QTreeWidget::itemDoubleClicked, this, [this](QTreeWidgetItem *item, int) {
+    // itemActivated fires on both double-click and Enter, keeping the tree
+    // fully operable from the keyboard.
+    connect(this, &QTreeWidget::itemActivated, this, [this](QTreeWidgetItem *item, int) {
         const QString table = item->data(0, kRoleTable).toString();
         if (!table.isEmpty()) {
             const QString schema = item->data(0, kRoleSchema).toString();
@@ -109,7 +111,39 @@ void SchemaTree::setCatalog(const QVector<TableInfo> &tables)
         if (QTreeWidgetItem *item = itemsByKey.value(key))
             item->setSelected(true);
     }
+    applyFilter();
     resizeColumnToContents(0);
+    // The type column has no other sizing rule; fit it so localized type
+    // names and large system fonts don't clip.
+    resizeColumnToContents(1);
+}
+
+void SchemaTree::setFilter(const QString &text)
+{
+    m_filter = text.trimmed();
+    applyFilter();
+}
+
+void SchemaTree::applyFilter()
+{
+    const QString needle = m_filter;
+    const bool filtering = !needle.isEmpty();
+    for (int i = 0; i < topLevelItemCount(); ++i) {
+        QTreeWidgetItem *schemaItem = topLevelItem(i);
+        const bool schemaMatches = schemaItem->text(0).contains(needle, Qt::CaseInsensitive);
+        bool visibleChildren = false;
+        for (int t = 0; t < schemaItem->childCount(); ++t) {
+            QTreeWidgetItem *tableItem = schemaItem->child(t);
+            const bool matches =
+                schemaMatches || tableItem->text(0).contains(needle, Qt::CaseInsensitive);
+            tableItem->setHidden(filtering && !matches);
+            visibleChildren = visibleChildren || matches;
+        }
+        schemaItem->setHidden(filtering && !visibleChildren);
+        // While filtering, reveal matches even if the schema was collapsed.
+        if (filtering && visibleChildren)
+            schemaItem->setExpanded(true);
+    }
 }
 
 void SchemaTree::showContextMenu(const QPoint &pos)

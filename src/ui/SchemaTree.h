@@ -17,6 +17,8 @@ public:
 public slots:
     void setCatalog(const QVector<ducq::TableInfo> &tables);
     void retranslateUi();
+    // Case-insensitive name filter; empty text shows everything.
+    void setFilter(const QString &text);
 
 signals:
     void tableActivated(const QString &qualifiedName);
@@ -25,6 +27,9 @@ signals:
 
 private:
     void showContextMenu(const QPoint &pos);
+    void applyFilter();
+
+    QString m_filter;
 };
 
 } // namespace ducq
