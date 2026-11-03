@@ -697,6 +697,12 @@ endif()
 if(TARGET mysql_scanner_pack)
     # The packed mysql archive is produced by a custom command; make the
     # final binaries wait for it.
-    add_dependencies(DucQ mysql_scanner_pack ducq_extension_loader)
-    add_dependencies(test_core mysql_scanner_pack ducq_extension_loader)
+    add_dependencies(DucQ mysql_scanner_pack)
+    add_dependencies(test_core mysql_scanner_pack)
+endif()
+if(TARGET ducq_extension_loader)
+    # The generated extension loader object (dynamic mode) must exist before
+    # the binaries link.
+    add_dependencies(DucQ ducq_extension_loader)
+    add_dependencies(test_core ducq_extension_loader)
 endif()
