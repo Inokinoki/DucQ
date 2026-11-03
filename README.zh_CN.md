@@ -28,7 +28,8 @@
 ## 功能
 
 - 打开 / 新建 `.duckdb` 数据库文件，内置内存数据库开箱即用
-- 通过 SQL `ATTACH` 查询远端数据库：`ATTACH 'host=localhost dbname=shop' AS pg (TYPE POSTGRES);`（支持 Postgres；SQLite 文件用 `TYPE SQLITE`），attached 的表会出现在 schema 树中
+- 通过 SQL 查询多种远端后端：`ATTACH 'host=localhost dbname=shop' AS pg (TYPE POSTGRES);`（Postgres；SQLite 文件用 `TYPE SQLITE`）；httpfs 直接读云存储与 URL（`read_parquet('s3://bucket/data.parquet')`、`read_csv('https://…')`）；`read_xlsx()` 查 Excel；attached 的表会出现在 schema 树中
+- 内置全文搜索（`PRAGMA create_fts_index` + `match_bm25`）与向量相似度检索（HNSW 索引）
 - 支持多个并发连接，每个连接独立工作线程 —— 通过执行按钮旁的选择器或 `Ctrl+Tab` 切换（SQL 层 `ATTACH` 同样可用）
 - Schema 树：按 schema 分组的表 / 视图 / 列，支持名称筛选，双击生成 `SELECT`
 - SQL 编辑器：语法高亮、行号、查找替换（`Ctrl+F`）、可只执行选中片段，`Ctrl+Enter` 执行
@@ -71,7 +72,7 @@ cmake --build build
 - **线程模型**：每个数据库一个 worker `QThread`；查询在该线程通过 `duckdb_pending_prepared` + `duckdb_pending_execute_task` 驱动，UI 与查询层只经 queued signal/slot 通信；`duckdb_interrupt` 实现跨线程取消。
 - **结果访问**：执行完成后获得物化结果（2.0 中 `duckdb_pending_prepared` 默认物化），`duckdb_result` 所有权移交 UI 线程，`duckdb_value_*` 访问器惰性转换单元格——对任意向量布局（字典 / 压缩）安全，避免触碰原始 flat 指针。
 - **静态扩展**：DuckDB 2.0 的静态扩展（parquet/json/icu 等）需在 `duckdb_open` 前调用 `duckdb_register_static_extension(<ext>_describe)` 注册，见 `src/core/StaticExtensions.cpp`。
-- **远端数据库**：`postgres_scanner` 与 `sqlite_scanner` 扩展从源码构建（预编译静态库包不含它们），以同样方式静态注册。`postgres_scanner` 需要 **libpq ≥ 18**（OAuth API）；CMake 会检测头文件，发现旧版 libpq 时自动跳过该扩展。`mysql_scanner` 需要外部 libmariadb（vcpkg），暂未构建。
+- **远端数据库与额外后端**：`postgres_scanner`、`sqlite_scanner`、`httpfs`、`excel`、`fts`、`vss` 扩展从源码构建（预编译静态库包不含它们），以同样方式静态注册。`postgres_scanner` 需要 **libpq ≥ 18**（OAuth API），`excel` 需要 **minizip-ng**；CMake 会逐一探测依赖，缺失时自动跳过对应扩展，保证各平台构建始终通过。`mysql_scanner` 需要外部 libmariadb（vcpkg），暂未构建。
 - **大结果集**：物化结果常驻内存，超大数据集请在 SQL 中加 `LIMIT`（导出走 `COPY`，服务端流式，不受影响）。
 
 ## Roadmap

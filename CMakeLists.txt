@@ -115,11 +115,16 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------
-# Remote-database extensions (postgres / sqlite scanners)
+# Out-of-tree extensions built from source (the prebuilt static-libs bundle
+# does not include them):
 #
-# v2.0.0 ships these as out-of-tree extensions: the prebuilt static-libs
-# bundle does not include them, so we build them from source. DuckDB's own
-# root CMake fetches each extension repo at the pinned, v2.0.0-compatible
+#   postgres_scanner — ATTACH Postgres (needs libpq >= 18, see probe below)
+#   sqlite_scanner   — ATTACH SQLite files
+#   httpfs           — read parquet/csv/json over HTTP(S), S3, R2, GCS, Azure
+#   excel            — read_xlsx() for Excel files
+#   fts / vss        — full-text search / vector similarity search
+#
+# DuckDB's own root CMake fetches each repo at the pinned, v2.0.0-compatible
 # commit via BUILD_EXTENSIONS; BUILD_EXTENSIONS_ONLY skips rebuilding the
 # core (we link the prebuilt duckdb_static above, same tag => same ABI).
 #
@@ -127,7 +132,13 @@ endif()
 # not built here. On MinGW the upstream config skips postgres, so it is
 # optional there.
 # ---------------------------------------------------------------------------
-set(DUCKDB_EXT_SOURCES postgres_scanner sqlite_scanner)
+set(DUCKDB_EXT_SOURCES
+    postgres_scanner
+    sqlite_scanner
+    httpfs
+    excel
+    fts
+    vss)
 
 # postgres_scanner needs libpq >= 18 (OAuth APIs, e.g. PGoauthBearerRequest).
 # Detect the header and drop postgres gracefully when only an older libpq
@@ -145,6 +156,13 @@ if(DUCQ_PQ_INCLUDE_DIR)
 else()
     message(STATUS "DucQ: libpq not found — building without postgres_scanner")
     list(REMOVE_ITEM DUCKDB_EXT_SOURCES postgres_scanner)
+endif()
+
+# excel needs minizip-ng; drop it gracefully when unavailable.
+find_package(minizip-ng QUIET CONFIG)
+if(NOT minizip-ng_FOUND)
+    message(STATUS "DucQ: minizip-ng not found — building without excel (brew install minizip-ng / vcpkg minizip-ng)")
+    list(REMOVE_ITEM DUCKDB_EXT_SOURCES excel)
 endif()
 FetchContent_Declare(duckdb_ext
     GIT_REPOSITORY "https://github.com/duckdb/duckdb.git"
@@ -184,6 +202,30 @@ foreach(_name IN LISTS DUCKDB_EXT_SOURCES)
                     OpenSSL::SSL OpenSSL::Crypto)
             else()
                 target_link_libraries(duckdb_bundle INTERFACE ${PostgreSQL_LIBRARY} ssl crypto)
+            endif()
+        elseif(_name STREQUAL "excel")
+            # excel's code includes "minizip-ng/mz.h", expecting the vcpkg
+            # layout where the package exposes <prefix>/include. Homebrew's
+            # config exposes <prefix>/include/minizip-ng itself, so add the
+            # parent directory to make the prefixed includes resolve — for
+            # both the static archive and the loadable targets.
+            get_target_property(_mz_inc MINIZIP::minizip-ng INTERFACE_INCLUDE_DIRECTORIES)
+            if(_mz_inc)
+                list(GET _mz_inc 0 _mz_inc0)
+                get_filename_component(_mz_parent "${_mz_inc0}/.." ABSOLUTE)
+                foreach(_t excel_extension excel_loadable_extension)
+                    if(TARGET ${_t})
+                        target_include_directories(${_t} SYSTEM PUBLIC "${_mz_parent}")
+                    endif()
+                endforeach()
+            endif()
+        elseif(_name STREQUAL "httpfs")
+            # Same PRIVATE-linking situation for its TLS backend.
+            find_package(OpenSSL QUIET)
+            if(OpenSSL_FOUND)
+                target_link_libraries(duckdb_bundle INTERFACE OpenSSL::SSL OpenSSL::Crypto)
+            else()
+                target_link_libraries(duckdb_bundle INTERFACE ssl crypto)
             endif()
         endif()
     else()

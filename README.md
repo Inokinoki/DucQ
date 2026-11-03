@@ -28,7 +28,8 @@ A cross-platform [DuckDB](https://duckdb.org) desktop client — pure C++ / Qt W
 ## Features
 
 - Open / create `.duckdb` database files; an in-memory database works out of the box
-- Query remote databases over SQL `ATTACH`: `ATTACH 'host=localhost dbname=shop' AS pg (TYPE POSTGRES);` (Postgres, and SQLite files via `TYPE SQLITE`); attached tables appear in the schema tree
+- Query remote backends over SQL: `ATTACH 'host=localhost dbname=shop' AS pg (TYPE POSTGRES);` (Postgres, SQLite files via `TYPE SQLITE`), cloud storage & URLs via httpfs (`read_parquet('s3://bucket/data.parquet')`, `read_csv('https://…')`), Excel via `read_xlsx()`; attached tables appear in the schema tree
+- Full-text search (`PRAGMA create_fts_index` + `match_bm25`) and vector similarity (HNSW indexes) built in
 - Multiple simultaneous connections, each with its own worker thread — switch via the selector next to Run or `Ctrl+Tab` (SQL-level `ATTACH` works too)
 - Schema tree: tables / views / columns grouped by schema, name filter, double-click to generate a `SELECT`
 - SQL editor: syntax highlighting, line numbers, find & replace (`Ctrl+F`), run the selection or the whole buffer with `Ctrl+Enter`
@@ -71,7 +72,7 @@ Three-platform CI: see [.github/workflows/build.yml](.github/workflows/build.yml
 - **Threading model**: one worker `QThread` per database; queries are driven there through `duckdb_pending_prepared` + `duckdb_pending_execute_task`, and the UI talks to the query layer only via queued signal/slot. `duckdb_interrupt` provides cross-thread cancellation.
 - **Result access**: execution finishes into a materialized result (in 2.0, `duckdb_pending_prepared` materializes by default). The `duckdb_result` is handed to the UI thread, which converts cells lazily with the `duckdb_value_*` accessors — safe for any internal vector layout, without ever touching raw flat pointers.
 - **Static extensions**: DuckDB 2.0's statically linked extensions (parquet/json/icu/…) must be registered with `duckdb_register_static_extension(<ext>_describe)` before the first `duckdb_open()`; see `src/core/StaticExtensions.cpp`.
-- **Remote databases**: the `postgres_scanner` and `sqlite_scanner` extensions are built from source (the prebuilt static-libs bundle doesn't ship them) and statically registered the same way. `postgres_scanner` requires **libpq ≥ 18** (OAuth APIs); CMake detects the header and silently skips the extension when an older libpq is found. `mysql_scanner` needs an external libmariadb (vcpkg) and is not built.
+- **Remote databases & extra backends**: the `postgres_scanner`, `sqlite_scanner`, `httpfs`, `excel`, `fts` and `vss` extensions are built from source (the prebuilt static-libs bundle doesn't ship them) and statically registered the same way. `postgres_scanner` requires **libpq ≥ 18** (OAuth APIs) and `excel` requires **minizip-ng**; CMake detects each dependency and silently skips the affected extension when it is missing, so builds stay green everywhere. `mysql_scanner` needs an external libmariadb (vcpkg) and is not built.
 - **Large result sets**: materialized results stay in memory; add a `LIMIT` in SQL for very large data (exports go through `COPY`, which streams server-side and is unaffected).
 
 ## Roadmap

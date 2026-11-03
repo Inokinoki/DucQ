@@ -21,6 +21,11 @@ int32_t duckdb_extension_sqlite_scanner_describe(duckdb_extension_descriptor *);
 #if !defined(__MINGW32__) && !defined(__MINGW64__)
 int32_t duckdb_extension_postgres_scanner_describe(duckdb_extension_descriptor *);
 #endif
+// httpfs (S3/GCS/Azure/HTTP), excel (read_xlsx), full-text and vector search.
+int32_t duckdb_extension_httpfs_describe(duckdb_extension_descriptor *);
+int32_t duckdb_extension_excel_describe(duckdb_extension_descriptor *);
+int32_t duckdb_extension_fts_describe(duckdb_extension_descriptor *);
+int32_t duckdb_extension_vss_describe(duckdb_extension_descriptor *);
 }
 
 namespace ducq {
@@ -43,6 +48,10 @@ const ExtensionEntry kExtensions[] = {
 #if !defined(__MINGW32__) && !defined(__MINGW64__)
     {"postgres_scanner", duckdb_extension_postgres_scanner_describe},
 #endif
+    {"httpfs", duckdb_extension_httpfs_describe},
+    {"excel", duckdb_extension_excel_describe},
+    {"fts", duckdb_extension_fts_describe},
+    {"vss", duckdb_extension_vss_describe},
 };
 
 std::once_flag g_registered;
