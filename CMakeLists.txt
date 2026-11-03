@@ -115,6 +115,83 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------
+# Remote-database extensions (postgres / sqlite scanners)
+#
+# v2.0.0 ships these as out-of-tree extensions: the prebuilt static-libs
+# bundle does not include them, so we build them from source. DuckDB's own
+# root CMake fetches each extension repo at the pinned, v2.0.0-compatible
+# commit via BUILD_EXTENSIONS; BUILD_EXTENSIONS_ONLY skips rebuilding the
+# core (we link the prebuilt duckdb_static above, same tag => same ABI).
+#
+# mysql_scanner additionally needs an external libmariadb (vcpkg), so it is
+# not built here. On MinGW the upstream config skips postgres, so it is
+# optional there.
+# ---------------------------------------------------------------------------
+set(DUCKDB_EXT_SOURCES postgres_scanner sqlite_scanner)
+
+# postgres_scanner needs libpq >= 18 (OAuth APIs, e.g. PGoauthBearerRequest).
+# Detect the header and drop postgres gracefully when only an older libpq
+# exists — sqlite_scanner has no external dependencies and always builds.
+find_path(DUCQ_PQ_INCLUDE_DIR libpq-fe.h
+    HINTS ${PostgreSQL_ROOT}/include /opt/homebrew/opt/libpq/include
+    PATH_SUFFIXES postgresql)
+if(DUCQ_PQ_INCLUDE_DIR)
+    file(READ "${DUCQ_PQ_INCLUDE_DIR}/libpq-fe.h" _pq_header)
+    if(NOT _pq_header MATCHES "PGoauthBearerRequest")
+        message(STATUS "DucQ: libpq without OAuth APIs found — building without postgres_scanner (libpq >= 18 required)")
+        list(REMOVE_ITEM DUCKDB_EXT_SOURCES postgres_scanner)
+    endif()
+    unset(_pq_header)
+else()
+    message(STATUS "DucQ: libpq not found — building without postgres_scanner")
+    list(REMOVE_ITEM DUCKDB_EXT_SOURCES postgres_scanner)
+endif()
+FetchContent_Declare(duckdb_ext
+    GIT_REPOSITORY "https://github.com/duckdb/duckdb.git"
+    GIT_TAG "v2.0.0"
+    GIT_SHALLOW TRUE)
+set(BUILD_EXTENSIONS_ONLY ON CACHE BOOL "" FORCE)
+set(BUILD_EXTENSIONS "${DUCKDB_EXT_SOURCES}" CACHE STRING "" FORCE)
+set(BUILD_MAIN_DUCKDB_LIBRARY OFF CACHE BOOL "" FORCE)
+set(BUILD_SHELL OFF CACHE BOOL "" FORCE)
+set(BUILD_UNITTESTS OFF CACHE BOOL "" FORCE)
+set(ENABLE_SANITIZER OFF CACHE BOOL "" FORCE)
+set(ENABLE_UBSAN OFF CACHE BOOL "" FORCE)
+set(BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
+
+# The extension build links its loadable artifacts against a duckdb_static
+# target, which BUILD_EXTENSIONS_ONLY does not create. Alias it to the
+# prebuilt archive (same v2.0.0 tag, so the symbols all resolve).
+if(NOT TARGET duckdb_static)
+    add_library(duckdb_static STATIC IMPORTED GLOBAL)
+    set_target_properties(duckdb_static PROPERTIES
+        IMPORTED_LOCATION "${duckdb_libs_SOURCE_DIR}/libduckdb_static.a")
+endif()
+FetchContent_MakeAvailable(duckdb_ext)
+
+# Link the extension targets directly — output paths and build order come
+# from CMake. MinGW's upstream config skips postgres, so check per target.
+foreach(_name IN LISTS DUCKDB_EXT_SOURCES)
+    if(TARGET ${_name}_extension)
+        message(STATUS "DucQ: linking remote-db extension ${_name}")
+        target_link_libraries(duckdb_bundle INTERFACE ${_name}_extension)
+        if(_name STREQUAL "postgres_scanner")
+            # The scanner links libpq/OpenSSL PRIVATEly, so the final binary
+            # must pick them up itself.
+            find_package(OpenSSL QUIET)
+            if(OpenSSL_FOUND)
+                target_link_libraries(duckdb_bundle INTERFACE ${PostgreSQL_LIBRARY}
+                    OpenSSL::SSL OpenSSL::Crypto)
+            else()
+                target_link_libraries(duckdb_bundle INTERFACE ${PostgreSQL_LIBRARY} ssl crypto)
+            endif()
+        endif()
+    else()
+        message(STATUS "DucQ: remote-db extension ${_name} not built (skipped)")
+    endif()
+endforeach()
+
+# ---------------------------------------------------------------------------
 # DucQ
 # ---------------------------------------------------------------------------
 set(DUCQ_CORE_SOURCES

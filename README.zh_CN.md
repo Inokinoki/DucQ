@@ -17,6 +17,10 @@
 
 </details>
 
+![DucQ 深色主题](docs/screenshots/main-window-dark.png)
+
+*深色主题 —— 默认跟随系统外观，也可在“视图 → 主题”手动切换。*
+
 ![DucQ NULL 值展示](docs/screenshots/null-values.png)
 
 *NULL 以灰色渲染、数值列右对齐，每个查询在独立的结果页签中展示。*
@@ -24,10 +28,12 @@
 ## 功能
 
 - 打开 / 新建 `.duckdb` 数据库文件，内置内存数据库开箱即用
-- 支持多个并发连接，每个连接独立工作线程 —— 通过执行按钮旁的选择器切换（SQL 层 `ATTACH` 同样可用）
-- Schema 树：按 schema 分组的表 / 视图 / 列，双击生成 `SELECT`
-- SQL 编辑器：关键字 / 字符串 / 注释高亮，`Ctrl+Enter` 执行
-- 结果表格：虚拟化渲染，默认展示前 100 万行（超过显示"已截断"）
+- 通过 SQL `ATTACH` 查询远端数据库：`ATTACH 'host=localhost dbname=shop' AS pg (TYPE POSTGRES);`（支持 Postgres；SQLite 文件用 `TYPE SQLITE`），attached 的表会出现在 schema 树中
+- 支持多个并发连接，每个连接独立工作线程 —— 通过执行按钮旁的选择器或 `Ctrl+Tab` 切换（SQL 层 `ATTACH` 同样可用）
+- Schema 树：按 schema 分组的表 / 视图 / 列，支持名称筛选，双击生成 `SELECT`
+- SQL 编辑器：语法高亮、行号、查找替换（`Ctrl+F`）、可只执行选中片段，`Ctrl+Enter` 执行
+- 结果表格：虚拟化渲染（默认展示前 100 万行，超过显示"已截断"），点击表头排序，单元格/行/选区复制为 TSV
+- 浅色 / 深色主题，默认跟随系统外观（视图 → 主题）
 - 查询进度条 + 随时取消（`duckdb_interrupt`）
 - 拖入 `csv / tsv / parquet / json` 文件自动建视图并预览
 - 结果导出 CSV / Parquet（`COPY` 流式写出，不受展示行数限制）
@@ -65,13 +71,14 @@ cmake --build build
 - **线程模型**：每个数据库一个 worker `QThread`；查询在该线程通过 `duckdb_pending_prepared` + `duckdb_pending_execute_task` 驱动，UI 与查询层只经 queued signal/slot 通信；`duckdb_interrupt` 实现跨线程取消。
 - **结果访问**：执行完成后获得物化结果（2.0 中 `duckdb_pending_prepared` 默认物化），`duckdb_result` 所有权移交 UI 线程，`duckdb_value_*` 访问器惰性转换单元格——对任意向量布局（字典 / 压缩）安全，避免触碰原始 flat 指针。
 - **静态扩展**：DuckDB 2.0 的静态扩展（parquet/json/icu 等）需在 `duckdb_open` 前调用 `duckdb_register_static_extension(<ext>_describe)` 注册，见 `src/core/StaticExtensions.cpp`。
+- **远端数据库**：`postgres_scanner` 与 `sqlite_scanner` 扩展从源码构建（预编译静态库包不含它们），以同样方式静态注册。`postgres_scanner` 需要 **libpq ≥ 18**（OAuth API）；CMake 会检测头文件，发现旧版 libpq 时自动跳过该扩展。`mysql_scanner` 需要外部 libmariadb（vcpkg），暂未构建。
 - **大结果集**：物化结果常驻内存，超大数据集请在 SQL 中加 `LIMIT`（导出走 `COPY`，服务端流式，不受影响）。
 
 ## Roadmap
 
 - [ ] 大结果集流式展示（服务端分页 / 自动 LIMIT 包装）
 - [ ] SQL 自动补全（autocomplete 扩展已静态链接）
-- [ ] 内置图表、结果筛选排序
+- [ ] 内置图表、结果筛选（排序已完成）
 - [ ] 安装包分发（macOS 签名公证 / Windows installer / AppImage）
 
 新增或更新翻译：运行 `lupdate src tests -ts translations/ducq_<lang>.ts`，在

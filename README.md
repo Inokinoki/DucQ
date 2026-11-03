@@ -17,6 +17,10 @@ A cross-platform [DuckDB](https://duckdb.org) desktop client — pure C++ / Qt W
 
 </details>
 
+![DucQ dark theme](docs/screenshots/main-window-dark.png)
+
+*Dark theme — follows the system appearance by default, switch manually under View → Theme.*
+
 ![DucQ result table with NULLs](docs/screenshots/null-values.png)
 
 *NULLs render in gray, numeric columns right-align, and every query opens in its own result tab.*
@@ -24,10 +28,12 @@ A cross-platform [DuckDB](https://duckdb.org) desktop client — pure C++ / Qt W
 ## Features
 
 - Open / create `.duckdb` database files; an in-memory database works out of the box
-- Multiple simultaneous connections, each with its own worker thread — switch via the selector next to Run (SQL-level `ATTACH` works too)
-- Schema tree: tables / views / columns grouped by schema, double-click to generate a `SELECT`
-- SQL editor: keyword / string / comment highlighting, `Ctrl+Enter` to execute
-- Result table: virtualized rendering, shows the first 1,000,000 rows by default (marked "truncated" beyond that)
+- Query remote databases over SQL `ATTACH`: `ATTACH 'host=localhost dbname=shop' AS pg (TYPE POSTGRES);` (Postgres, and SQLite files via `TYPE SQLITE`); attached tables appear in the schema tree
+- Multiple simultaneous connections, each with its own worker thread — switch via the selector next to Run or `Ctrl+Tab` (SQL-level `ATTACH` works too)
+- Schema tree: tables / views / columns grouped by schema, name filter, double-click to generate a `SELECT`
+- SQL editor: syntax highlighting, line numbers, find & replace (`Ctrl+F`), run the selection or the whole buffer with `Ctrl+Enter`
+- Result table: virtualized rendering (first 1,000,000 rows by default, marked "truncated" beyond), click-to-sort, copy cell/row/selection as TSV
+- Light / dark theme, following the system appearance (View → Theme)
 - Query progress bar + cancel at any time (`duckdb_interrupt`)
 - Drag in `csv / tsv / parquet / json` files to auto-create views and preview them
 - Export results to CSV / Parquet (`COPY` streams server-side, unaffected by the display row limit)
@@ -65,13 +71,14 @@ Three-platform CI: see [.github/workflows/build.yml](.github/workflows/build.yml
 - **Threading model**: one worker `QThread` per database; queries are driven there through `duckdb_pending_prepared` + `duckdb_pending_execute_task`, and the UI talks to the query layer only via queued signal/slot. `duckdb_interrupt` provides cross-thread cancellation.
 - **Result access**: execution finishes into a materialized result (in 2.0, `duckdb_pending_prepared` materializes by default). The `duckdb_result` is handed to the UI thread, which converts cells lazily with the `duckdb_value_*` accessors — safe for any internal vector layout, without ever touching raw flat pointers.
 - **Static extensions**: DuckDB 2.0's statically linked extensions (parquet/json/icu/…) must be registered with `duckdb_register_static_extension(<ext>_describe)` before the first `duckdb_open()`; see `src/core/StaticExtensions.cpp`.
+- **Remote databases**: the `postgres_scanner` and `sqlite_scanner` extensions are built from source (the prebuilt static-libs bundle doesn't ship them) and statically registered the same way. `postgres_scanner` requires **libpq ≥ 18** (OAuth APIs); CMake detects the header and silently skips the extension when an older libpq is found. `mysql_scanner` needs an external libmariadb (vcpkg) and is not built.
 - **Large result sets**: materialized results stay in memory; add a `LIMIT` in SQL for very large data (exports go through `COPY`, which streams server-side and is unaffected).
 
 ## Roadmap
 
 - [ ] Streaming display for huge result sets (server-side paging / automatic LIMIT wrapping)
 - [ ] SQL autocompletion (the autocomplete extension is already statically linked)
-- [ ] Built-in charts, result filtering & sorting
+- [ ] Built-in charts, result filtering (sorting is done)
 - [ ] Packaged distribution (macOS notarization / Windows installer / AppImage)
 
 To add or update a translation: run `lupdate src tests -ts translations/ducq_<lang>.ts`, fill in

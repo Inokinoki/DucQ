@@ -15,6 +15,12 @@ int32_t duckdb_extension_core_functions_describe(duckdb_extension_descriptor *);
 int32_t duckdb_extension_autocomplete_describe(duckdb_extension_descriptor *);
 int32_t duckdb_extension_tpch_describe(duckdb_extension_descriptor *);
 int32_t duckdb_extension_tpcds_describe(duckdb_extension_descriptor *);
+// Remote-database scanners are built from source (see CMakeLists.txt). The
+// upstream extension config skips postgres on MinGW, so guard the symbol.
+int32_t duckdb_extension_sqlite_scanner_describe(duckdb_extension_descriptor *);
+#if !defined(__MINGW32__) && !defined(__MINGW64__)
+int32_t duckdb_extension_postgres_scanner_describe(duckdb_extension_descriptor *);
+#endif
 }
 
 namespace ducq {
@@ -33,6 +39,10 @@ const ExtensionEntry kExtensions[] = {
     {"autocomplete", duckdb_extension_autocomplete_describe},
     {"tpch", duckdb_extension_tpch_describe},
     {"tpcds", duckdb_extension_tpcds_describe},
+    {"sqlite_scanner", duckdb_extension_sqlite_scanner_describe},
+#if !defined(__MINGW32__) && !defined(__MINGW64__)
+    {"postgres_scanner", duckdb_extension_postgres_scanner_describe},
+#endif
 };
 
 std::once_flag g_registered;
