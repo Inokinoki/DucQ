@@ -517,6 +517,46 @@ T = {
         "zh_CN": "关闭", "ja": "閉じる", "ko": "닫기", "de": "Schließen",
         "fr": "Fermer", "es": "Cerrar", "pt_BR": "Fechar", "ru": "Закрыть",
     },
+    "Filter tables…": {
+        "zh_CN": "筛选表…", "ja": "テーブルを絞り込み…", "ko": "테이블 필터…",
+        "de": "Tabellen filtern…", "fr": "Filtrer les tables…", "es": "Filtrar tablas…",
+        "pt_BR": "Filtrar tabelas…", "ru": "Фильтр таблиц…",
+    },
+    "Active connection (Ctrl+Tab cycles)": {
+        "zh_CN": "当前连接（Ctrl+Tab 切换）",
+        "ja": "アクティブな接続（Ctrl+Tab で切り替え）",
+        "ko": "활성 연결(Ctrl+Tab으로 전환)",
+        "de": "Aktive Verbindung (Ctrl+Tab wechselt)",
+        "fr": "Connexion active (Ctrl+Tab pour naviguer)",
+        "es": "Conexión activa (Ctrl+Tab cambia)",
+        "pt_BR": "Conexão ativa (Ctrl+Tab alterna)",
+        "ru": "Активное подключение (Ctrl+Tab — переключение)",
+    },
+    "Ln %1, Col %2": {
+        "zh_CN": "第 %1 行，第 %2 列", "ja": "%1 行 %2 列", "ko": "%1행 %2열",
+        "de": "Z %1, Sp %2", "fr": "Lig %1, Col %2", "es": "Lín %1, Col %2",
+        "pt_BR": "Lin %1, Col %2", "ru": "Стр %1, стлб %2",
+    },
+    "Run a query (Ctrl+⏎) to see results here": {
+        "zh_CN": "执行查询（Ctrl+⏎）后结果将显示在这里",
+        "ja": "クエリを実行（Ctrl+⏎）すると結果がここに表示されます",
+        "ko": "쿼리를 실행(Ctrl+⏎)하면 여기에 결과가 표시됩니다",
+        "de": "Abfrage ausführen (Ctrl+⏎), um Ergebnisse hier zu sehen",
+        "fr": "Exécutez une requête (Ctrl+⏎) pour voir les résultats ici",
+        "es": "Ejecuta una consulta (Ctrl+⏎) para ver los resultados aquí",
+        "pt_BR": "Execute uma consulta (Ctrl+⏎) para ver os resultados aqui",
+        "ru": "Выполните запрос (Ctrl+⏎), и результаты появятся здесь",
+    },
+    "Cursor position": {
+        "zh_CN": "光标位置", "ja": "カーソル位置", "ko": "커서 위치", "de": "Cursorposition",
+        "fr": "Position du curseur", "es": "Posición del cursor", "pt_BR": "Posição do cursor",
+        "ru": "Позиция курсора",
+    },
+    "Ln %L1, Col %L2": {
+        "zh_CN": "第 %L1 行，第 %L2 列", "ja": "%L1 行 %L2 列", "ko": "%L1행 %L2열",
+        "de": "Z %L1, Sp %L2", "fr": "Lig %L1, Col %L2", "es": "Lín %L1, Col %L2",
+        "pt_BR": "Lin %L1, Col %L2", "ru": "Стр %L1, стлб %L2",
+    },
 }
 
 LANGS = ["zh_CN", "ja", "ko", "de", "fr", "es", "pt_BR", "ru"]
