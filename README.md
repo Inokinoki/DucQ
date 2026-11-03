@@ -45,6 +45,11 @@ A cross-platform [DuckDB](https://duckdb.org) desktop client — pure C++ / Qt W
 
 Requirements: CMake ≥ 3.24, Ninja, Qt ≥ 6.4 (Widgets + Test), a C++20 compiler. DuckDB v2.0.0 static libraries are downloaded automatically by CMake FetchContent (SHA256-verified) — nothing to install manually.
 
+Two build modes:
+
+- **Default (static)**: single binary, all bundled extensions statically registered, dynamic extension loading compiled out of the engine.
+- **`-DDUCQ_DYNAMIC_EXTENSIONS=ON`**: the engine is built from source with `INSTALL`/`LOAD` enabled. Out-of-tree extensions are placed in an `extensions/` directory next to the executable and auto-loaded at startup, and any DuckDB extension installed into `~/.duckdb/extensions/` (including community builds — `allow_unsigned_extensions` is set) is picked up too. Still a single binary; extension failures at startup are skipped silently.
+
 ```bash
 # macOS (Homebrew Qt)
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"

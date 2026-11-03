@@ -43,6 +43,11 @@
 
 ## 构建
 
+两种构建模式：
+
+- **默认（静态）**：单二进制，内置扩展全部静态注册，引擎的动态扩展加载机制在编译期被剔除。
+- **`-DDUCQ_DYNAMIC_EXTENSIONS=ON`**：引擎改为源码构建并启用 `INSTALL`/`LOAD`。源码树扩展以动态库形态放在可执行文件旁的 `extensions/` 目录，启动时自动加载；`~/.duckdb/extensions/` 下已安装的任何 DuckDB 扩展（含社区构建——会设置 `allow_unsigned_extensions`）同样会被拾取。仍是单二进制；启动时加载失败的扩展会被静默跳过。
+
 依赖：CMake ≥ 3.24、Ninja、Qt ≥ 6.4（Widgets + Test）、C++20 编译器。DuckDB v2.0.0 静态库由 CMake FetchContent 自动下载（含 SHA256 校验），无需手动安装。
 
 ```bash

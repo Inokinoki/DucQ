@@ -52,6 +52,26 @@ else()
 endif()
 
 include(FetchContent)
+
+# ---------------------------------------------------------------------------
+# Extension loading model
+#
+# OFF: engine + in-tree extensions come from the prebuilt static-libs bundle
+#      (built with DUCKDB_STATIC_BUILD by DuckDB's CI); dynamic extension
+#      loading is compiled out. Single binary, fully offline.
+# ON:  engine is built from source WITHOUT DUCKDB_STATIC_BUILD and with all
+#      DuckDB extensions statically linked into it — the same layout as the
+#      official duckdb CLI. INSTALL/LOAD of dynamically loaded extensions
+#      (e.g. MotherDuck) work, and DucQ auto-LOADs every *.duckdb_extension
+#      found next to the executable. Still a single binary.
+# ---------------------------------------------------------------------------
+option(DUCQ_DYNAMIC_EXTENSIONS
+       "Build the DuckDB engine from source with dynamic extension loading enabled"
+       OFF)
+
+add_library(duckdb_bundle INTERFACE)
+
+if(NOT DUCQ_DYNAMIC_EXTENSIONS)
 FetchContent_Declare(duckdb_headers
     URL "${DUCKDB_URL_BASE}/libduckdb-src.zip"
     URL_HASH SHA256=d8fd3301aa01c2425475b153daf57d4a88d361eb09756575551a7a274da9cc16)
@@ -91,7 +111,6 @@ foreach(_name IN LISTS DUCKDB_LIB_NAMES)
     list(APPEND DUCKDB_LINK_LIBS "${_found}")
 endforeach()
 
-add_library(duckdb_bundle INTERFACE)
 target_include_directories(duckdb_bundle SYSTEM INTERFACE
     "${duckdb_headers_SOURCE_DIR}"
     "${duckdb_libs_SOURCE_DIR}")
@@ -113,6 +132,23 @@ else()
     # Restart Manager API used by DuckDB's file-lock diagnostics.
     target_link_libraries(duckdb_bundle INTERFACE Rstrtmgr.lib)
 endif()
+else() # DUCQ_DYNAMIC_EXTENSIONS
+# Engine comes from the source build below; headers live in the source tree.
+target_include_directories(duckdb_bundle SYSTEM INTERFACE
+    "${CMAKE_BINARY_DIR}/_deps/duckdb_ext-src"
+    "${CMAKE_BINARY_DIR}/_deps/duckdb_ext-src/src/include")
+# No DUCKDB_STATIC_BUILD: that define is what compiles the INSTALL/LOAD
+# machinery out. Extensions loaded at runtime resolve engine symbols from
+# this executable, so it must export them.
+target_compile_definitions(duckdb_bundle INTERFACE DUCQ_DYNAMIC_EXTENSIONS=1)
+if(UNIX AND NOT APPLE)
+    target_link_options(duckdb_bundle INTERFACE -Wl,--export-dynamic)
+endif()
+target_link_libraries(duckdb_bundle INTERFACE Threads::Threads)
+if(NOT WIN32)
+    target_link_libraries(duckdb_bundle INTERFACE ${CMAKE_DL_LIBS} m)
+endif()
+endif()
 
 # ---------------------------------------------------------------------------
 # Out-of-tree extensions built from source (the prebuilt static-libs bundle
@@ -132,7 +168,7 @@ endif()
 # not built here. On MinGW the upstream config skips postgres, so it is
 # optional there.
 # ---------------------------------------------------------------------------
-set(DUCKDB_EXT_SOURCES
+set(DUCKDB_OOTE_SOURCES
     postgres_scanner
     sqlite_scanner
     httpfs
@@ -144,6 +180,10 @@ set(DUCKDB_EXT_SOURCES
     delta
     mysql_scanner
     spatial)
+# Dynamic mode also builds the three in-tree extensions that the prebuilt
+# bundle ships but a source build must compile itself.
+set(DUCKDB_EXT_SOURCES ${DUCKDB_OOTE_SOURCES})
+list(APPEND DUCKDB_EXT_SOURCES autocomplete tpch tpcds)
 
 # postgres_scanner needs libpq >= 18 (OAuth APIs, e.g. PGoauthBearerRequest).
 # Detect the header and drop postgres gracefully when only an older libpq
@@ -259,15 +299,92 @@ FetchContent_Declare(duckdb_ext
     GIT_REPOSITORY "https://github.com/duckdb/duckdb.git"
     GIT_TAG "v2.0.0"
     GIT_SHALLOW TRUE)
-set(BUILD_EXTENSIONS_ONLY ON CACHE BOOL "" FORCE)
-set(BUILD_EXTENSIONS "${DUCKDB_EXT_SOURCES}" CACHE STRING "" FORCE)
-set(BUILD_MAIN_DUCKDB_LIBRARY OFF CACHE BOOL "" FORCE)
+# In dynamic mode everything but mysql_scanner is statically linked into the
+# engine by DuckDB's own build; static mode builds extensions only and links
+# the prebuilt engine archive.
+# Only the in-tree extensions produce static archives in this mode; every
+# out-of-tree extension exists as a loadable and is discovered + LOADed at
+# runtime by core/ExtensionLoader.
+set(DUCQ_ENGINE_STATIC_LINK "core_functions parquet json icu autocomplete tpch tpcds")
+if(DUCQ_DYNAMIC_EXTENSIONS)
+    set(BUILD_EXTENSIONS_ONLY OFF CACHE BOOL "" FORCE)
+    set(BUILD_MAIN_DUCKDB_LIBRARY ON CACHE BOOL "" FORCE)
+    # delta's Rust kernel build is flaky outside its primed build directory;
+    # the dynamic build skips it (the static build ships it).
+    set(DYN_EXTS "${DUCKDB_EXT_SOURCES}")
+    list(REMOVE_ITEM DYN_EXTS delta)
+    set(BUILD_EXTENSIONS "${DYN_EXTS}" CACHE STRING "" FORCE)
+    set(STATICALLY_LINK_EXTENSIONS "${DUCQ_ENGINE_STATIC_LINK}" CACHE STRING "" FORCE)
+    # The engine's own static-extension loader is added to its SHARED target
+    # only; link our own generated equivalent into the executable, so the
+    # statically linked extensions get registered before duckdb_open().
+    # loadable_extensions is DuckDB's pseudo-extension carrying the INSTALL/
+    # LOAD machinery; registering it wires the dynamic provider per database.
+    set(DUCQ_LOADER_EXTS loadable_extensions core_functions parquet json icu autocomplete tpch tpcds)
+    if(NOT MINGW)
+        list(INSERT DUCQ_LOADER_EXTS 4 postgres_scanner)
+    endif()
+    set(_decls "")
+    set(_regs "")
+    foreach(_ext IN LISTS DUCQ_LOADER_EXTS)
+        string(APPEND _decls "int32_t duckdb_extension_${_ext}_describe(duckdb_extension_descriptor *descriptor);\n")
+        string(APPEND _regs "\tif (duckdb_register_static_extension(duckdb_extension_${_ext}_describe) != 0) {\n\t\tresult = 1;\n\t}\n")
+    endforeach()
+    file(WRITE "${CMAKE_BINARY_DIR}/stubs/ducq_extension_loader.c" "
+// Generated by DucQ's CMakeLists.txt: registers the extensions statically
+// linked into the engine. Call duckdb_register_static_extensions() before
+// the first duckdb_open().
+#include \"duckdb_static_extension.h\"
+#ifdef __cplusplus
+extern \"C\" {
+#endif
+${_decls}
+int32_t duckdb_register_static_extensions(void) {
+	int32_t result = 0;
+${_regs}
+	return result;
+}
+#ifdef __cplusplus
+}
+#endif
+")
+    set(DUCQ_DUCKDB_SRC_DIR "${CMAKE_BINARY_DIR}/_deps/duckdb_ext-src")
+    add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/stubs/ducq_extension_loader.o"
+        COMMAND /usr/bin/cc -c "${CMAKE_BINARY_DIR}/stubs/ducq_extension_loader.c"
+                -o "${CMAKE_BINARY_DIR}/stubs/ducq_extension_loader.o"
+                -I"${DUCQ_DUCKDB_SRC_DIR}" -I"${DUCQ_DUCKDB_SRC_DIR}/src/include"
+        DEPENDS "${CMAKE_BINARY_DIR}/stubs/ducq_extension_loader.c")
+    add_custom_target(ducq_extension_loader DEPENDS "${CMAKE_BINARY_DIR}/stubs/ducq_extension_loader.o")
+    target_link_libraries(duckdb_bundle INTERFACE
+        "${CMAKE_BINARY_DIR}/stubs/ducq_extension_loader.o")
+    # The describe symbols live in the extensions' own static archives.
+    # Out-of-tree extensions only exist as loadables in this mode; they are
+    # discovered and LOADed at runtime by core/ExtensionLoader from the
+    # "extensions" directory next to the executable. Install them there.
+    if(NOT CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+        set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+    endif()
+else()
+    set(BUILD_EXTENSIONS_ONLY ON CACHE BOOL "" FORCE)
+    set(BUILD_EXTENSIONS "${DUCKDB_OOTE_SOURCES}" CACHE STRING "" FORCE)
+    set(BUILD_MAIN_DUCKDB_LIBRARY OFF CACHE BOOL "" FORCE)
+endif()
 set(BUILD_SHELL OFF CACHE BOOL "" FORCE)
 set(BUILD_UNITTESTS OFF CACHE BOOL "" FORCE)
 set(ENABLE_SANITIZER OFF CACHE BOOL "" FORCE)
 set(ENABLE_UBSAN OFF CACHE BOOL "" FORCE)
 set(BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
+# Whether the packed mysql archive excludes its vendored database-connector
+# code: in static mode postgres' archive (linked alongside) already carries
+# it; in dynamic mode the engine does NOT contain postgres' connector, so
+# mysql needs its own.
+if(DUCQ_DYNAMIC_EXTENSIONS)
+    set(DUCQ_PACK_EXCLUDE_DBCONNECTOR "OFF")
+else()
+    set(DUCQ_PACK_EXCLUDE_DBCONNECTOR "ON")
+endif()
 
+if(NOT DUCQ_DYNAMIC_EXTENSIONS)
 # The extension build links its loadable artifacts against a duckdb_static
 # target, which BUILD_EXTENSIONS_ONLY does not create. Alias it to the
 # prebuilt archive (same v2.0.0 tag, so the symbols all resolve).
@@ -276,11 +393,144 @@ if(NOT TARGET duckdb_static)
     set_target_properties(duckdb_static PROPERTIES
         IMPORTED_LOCATION "${duckdb_libs_SOURCE_DIR}/libduckdb_static.a")
 endif()
+endif()
 FetchContent_MakeAvailable(duckdb_ext)
+
+if(DUCQ_DYNAMIC_EXTENSIONS)
+    # The engine built above (with extension loading enabled) is linked
+    # statically, so the app stays a single binary.
+    target_link_libraries(duckdb_bundle INTERFACE duckdb_static)
+    # The INSTALL/LOAD machinery is its own archive, linked only into the
+    # engine's shared target by DuckDB's build; the executable needs it too.
+    if(TARGET duckdb_loadable_extensions)
+        target_link_libraries(duckdb_bundle INTERFACE duckdb_loadable_extensions)
+    endif()
+    # In-tree extensions have static archives in this mode; their describe
+    # symbols are needed by our generated loader.
+    foreach(_ext IN LISTS DUCQ_LOADER_EXTS)
+        if(TARGET ${_ext}_extension)
+            get_target_property(_atype ${_ext}_extension TYPE)
+            if(_atype STREQUAL "STATIC_LIBRARY")
+                target_link_libraries(duckdb_bundle INTERFACE ${_ext}_extension)
+            endif()
+        endif()
+    endforeach()
+endif()
 
 # Link the extension targets directly — output paths and build order come
 # from CMake. MinGW's upstream config skips postgres, so check per target.
 foreach(_name IN LISTS DUCKDB_EXT_SOURCES)
+    if(DUCQ_DYNAMIC_EXTENSIONS)
+        # Every extension except mysql is statically linked into the engine by
+        # DuckDB's build; only their PRIVATE external deps and the mysql pack
+        # need handling here.
+        if(_name STREQUAL "mysql_scanner")
+            if(NOT TARGET mysql_scanner_loadable_extension)
+                message(STATUS "DucQ: remote-db extension ${_name} not built (skipped)")
+                continue()
+            endif()
+            file(GLOB_RECURSE MYSQL_OBJS_ALL
+                "${duckdb_ext_BINARY_DIR}/extension/mysql_scanner/*.o")
+            set(MYSQL_OBJS "")
+            foreach(_o IN LISTS MYSQL_OBJS_ALL)
+                if(NOT _o MATCHES "/dbconnector/")
+                    list(APPEND MYSQL_OBJS "${_o}")
+                endif()
+            endforeach()
+            set(MYSQL_PACK "${CMAKE_BINARY_DIR}/stubs/libmysql_scanner_extension.a")
+            file(WRITE "${CMAKE_BINARY_DIR}/stubs/mysql_scanner_describe.c" "
+// Hand-written for the mysql_scanner static pack (see CMakeLists.txt).
+#include \"duckdb_static_extension.h\"
+
+void mysql_scanner_duckdb_cpp_init(void *loader);
+
+#ifdef __cplusplus
+extern \"C\" {
+#endif
+
+int32_t duckdb_extension_mysql_scanner_describe(duckdb_extension_descriptor *descriptor) {
+	if (descriptor->version < 1) {
+		descriptor->set_error(descriptor, \"extension mysql_scanner needs descriptor layout 1\");
+		return 1;
+	}
+	descriptor->version = 1;
+	descriptor->name = \"mysql_scanner\";
+	descriptor->extension_version = \"f7fc0d4271\";
+	descriptor->api_version = \"d54cbbe3df\";
+	descriptor->entry_cpp = (void (*)(void))mysql_scanner_duckdb_cpp_init;
+	return 0;
+}
+
+#ifdef __cplusplus
+}
+#endif
+")
+            add_custom_command(OUTPUT "${MYSQL_PACK}"
+                COMMAND /usr/bin/cc -c "${CMAKE_BINARY_DIR}/stubs/mysql_scanner_describe.c"
+                        -o "${CMAKE_BINARY_DIR}/stubs/mysql_scanner_describe.o"
+                        -I"${duckdb_ext_SOURCE_DIR}" -I"${duckdb_ext_SOURCE_DIR}/src/include"
+                COMMAND ${CMAKE_COMMAND}
+                        -DMYSQL_SRC_DIR="${duckdb_ext_BINARY_DIR}/extension/mysql_scanner"
+                        -DDESCRIBE_OBJ="${CMAKE_BINARY_DIR}/stubs/mysql_scanner_describe.o"
+                        -DMYSQL_PACK="${MYSQL_PACK}"
+                        -DEXCLUDE_DBCONNECTOR="${DUCQ_PACK_EXCLUDE_DBCONNECTOR}"
+                        -P "${CMAKE_CURRENT_LIST_DIR}/scripts/pack_mysql.cmake"
+                DEPENDS mysql_scanner_loadable_extension)
+            add_custom_target(mysql_scanner_pack DEPENDS "${MYSQL_PACK}")
+            target_link_libraries(duckdb_bundle INTERFACE "${MYSQL_PACK}" "${MARIADB_LIBRARY}")
+        elseif(_name STREQUAL "postgres_scanner")
+            find_package(OpenSSL QUIET)
+            if(OpenSSL_FOUND)
+                target_link_libraries(duckdb_bundle INTERFACE ${PostgreSQL_LIBRARY}
+                    OpenSSL::SSL OpenSSL::Crypto)
+            else()
+                target_link_libraries(duckdb_bundle INTERFACE ${PostgreSQL_LIBRARY} ssl crypto)
+            endif()
+        elseif(_name STREQUAL "excel")
+            find_package(EXPAT QUIET)
+            find_package(ZLIB QUIET)
+            target_link_libraries(duckdb_bundle INTERFACE MINIZIP::minizip-ng)
+            if(TARGET EXPAT::EXPAT)
+                target_link_libraries(duckdb_bundle INTERFACE EXPAT::EXPAT)
+            endif()
+            if(TARGET ZLIB::ZLIB)
+                target_link_libraries(duckdb_bundle INTERFACE ZLIB::ZLIB)
+            endif()
+            get_target_property(_mz_inc MINIZIP::minizip-ng INTERFACE_INCLUDE_DIRECTORIES)
+            if(_mz_inc)
+                list(GET _mz_inc 0 _mz_inc0)
+                get_filename_component(_mz_parent "${_mz_inc0}/.." ABSOLUTE)
+                foreach(_t excel_extension excel_loadable_extension)
+                    if(TARGET ${_t})
+                        target_include_directories(${_t} SYSTEM PUBLIC "${_mz_parent}")
+                    endif()
+                endforeach()
+            endif()
+        elseif(_name STREQUAL "httpfs")
+            find_package(OpenSSL QUIET)
+            find_package(CURL QUIET)
+            if(OpenSSL_FOUND)
+                target_link_libraries(duckdb_bundle INTERFACE OpenSSL::SSL OpenSSL::Crypto)
+            else()
+                target_link_libraries(duckdb_bundle INTERFACE ssl crypto)
+            endif()
+            if(TARGET CURL::libcurl)
+                target_link_libraries(duckdb_bundle INTERFACE CURL::libcurl)
+            endif()
+        elseif(_name STREQUAL "iceberg" OR _name STREQUAL "ducklake")
+            find_package(roaring QUIET CONFIG)
+            if(roaring_FOUND)
+                target_link_libraries(duckdb_bundle INTERFACE roaring::roaring)
+            endif()
+        elseif(_name STREQUAL "delta")
+            file(GLOB DELTA_RUST
+                "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/*/release/libdelta_kernel_ffi.a")
+            if(DELTA_RUST)
+                target_link_libraries(duckdb_bundle INTERFACE ${DELTA_RUST})
+            endif()
+        endif()
+        continue()
+    endif()
     # mysql_scanner never produces a <name>_extension target (v1-style CMake
     # only builds the loadable); its packed archive is handled below via
     # mysql_scanner_pack.
@@ -301,16 +551,8 @@ foreach(_name IN LISTS DUCKDB_EXT_SOURCES)
             # registration is impossible out of the box. Pack its objects into
             # an archive ourselves and hand-write the describe entry (the same
             # shape duckdb's own codegen produces for the other extensions).
-            file(GLOB_RECURSE MYSQL_OBJS_ALL
-                "${duckdb_ext_BINARY_DIR}/extension/mysql_scanner/*.o")
-            # The shared database-connector archive (from postgres) covers
-            # these; keeping mysql's copies would collide with it.
-            set(MYSQL_OBJS "")
-            foreach(_o IN LISTS MYSQL_OBJS_ALL)
-                if(NOT _o MATCHES "/dbconnector/")
-                    list(APPEND MYSQL_OBJS "${_o}")
-                endif()
-            endforeach()
+            # The dbconnector objects are excluded: postgres vendors the same
+            # database-connector code, already inside the engine.
             set(MYSQL_PACK "${CMAKE_BINARY_DIR}/stubs/libmysql_scanner_extension.a")
             file(WRITE "${CMAKE_BINARY_DIR}/stubs/mysql_scanner_describe.c" "
 // Hand-written for the mysql_scanner static pack (see CMakeLists.txt).
@@ -396,6 +638,7 @@ set(DUCQ_CORE_SOURCES
     src/core/AppSettings.cpp
     src/core/Database.cpp
     src/core/DbSession.cpp
+    src/core/ExtensionLoader.cpp
     src/core/HistoryStore.cpp
     src/core/ResultCache.cpp
     src/core/QueryRunner.cpp
@@ -438,9 +681,22 @@ else()
 endif()
 add_test(NAME test_core COMMAND test_core)
 
+if(DUCQ_DYNAMIC_EXTENSIONS)
+    # Install the out-of-tree loadables next to the executable, where
+    # core/ExtensionLoader finds and LOADs them at startup.
+    add_custom_target(ducq_collect_loadables ALL
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:DucQ>/extensions"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${duckdb_ext_BINARY_DIR}/extension"
+                "$<TARGET_FILE_DIR:DucQ>/extensions"
+        COMMENT "Collecting *.duckdb_extension loadables"
+        DEPENDS DucQ)
+endif()
+
 if(TARGET mysql_scanner_pack)
     # The packed mysql archive is produced by a custom command; make the
     # final binaries wait for it.
-    add_dependencies(DucQ mysql_scanner_pack)
-    add_dependencies(test_core mysql_scanner_pack)
+    add_dependencies(DucQ mysql_scanner_pack ducq_extension_loader)
+    add_dependencies(test_core mysql_scanner_pack ducq_extension_loader)
 endif()
