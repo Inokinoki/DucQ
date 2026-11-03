@@ -184,6 +184,12 @@ set(DUCKDB_OOTE_SOURCES
 # bundle ships but a source build must compile itself.
 set(DUCKDB_EXT_SOURCES ${DUCKDB_OOTE_SOURCES})
 list(APPEND DUCKDB_EXT_SOURCES autocomplete tpch tpcds)
+# Dependency probes below remove skipped extensions from BOTH lists (static
+# mode builds from DUCKDB_OOTE_SOURCES, dynamic from DUCKDB_EXT_SOURCES).
+macro(ducq_skip_extension _name)
+    list(REMOVE_ITEM DUCKDB_EXT_SOURCES "${_name}")
+    list(REMOVE_ITEM DUCKDB_OOTE_SOURCES "${_name}")
+endmacro()
 
 # postgres_scanner needs libpq >= 18 (OAuth APIs, e.g. PGoauthBearerRequest).
 # Detect the header and drop postgres gracefully when only an older libpq
@@ -200,14 +206,14 @@ if(DUCQ_PQ_INCLUDE_DIR)
     unset(_pq_header)
 else()
     message(STATUS "DucQ: libpq not found — building without postgres_scanner")
-    list(REMOVE_ITEM DUCKDB_EXT_SOURCES postgres_scanner)
+    ducq_skip_extension(postgres_scanner)
 endif()
 
 # excel needs minizip-ng; drop it gracefully when unavailable.
 find_package(minizip-ng QUIET CONFIG)
 if(NOT minizip-ng_FOUND)
     message(STATUS "DucQ: minizip-ng not found — building without excel (brew install minizip-ng / vcpkg minizip-ng)")
-    list(REMOVE_ITEM DUCKDB_EXT_SOURCES excel)
+    ducq_skip_extension(excel)
 endif()
 
 # spatial needs GDAL+PROJ plus the vcpkg-only unofficial-sqlite3 package;
@@ -244,11 +250,11 @@ endif()
         message(STATUS "DucQ: GDAL ${GDAL_VERSION} compatible — enabling spatial")
     else()
         message(STATUS "DucQ: GDAL ${GDAL_VERSION} incompatible with pinned spatial (needs < 3.13) — skipping spatial")
-        list(REMOVE_ITEM DUCKDB_EXT_SOURCES spatial)
+        ducq_skip_extension(spatial)
     endif()
 else()
     message(STATUS "DucQ: GDAL/PROJ/sqlite3 incomplete — building without spatial (brew install gdal)")
-    list(REMOVE_ITEM DUCKDB_EXT_SOURCES spatial)
+    ducq_skip_extension(spatial)
 endif()
 
 # mysql_scanner discovers libmariadb through the vcpkg-only
@@ -293,7 +299,7 @@ endif()
     message(STATUS "DucQ: libmariadb found — enabling mysql_scanner (${MARIADB_LIBRARY})")
 else()
     message(STATUS "DucQ: libmariadb not found — building without mysql_scanner")
-    list(REMOVE_ITEM DUCKDB_EXT_SOURCES mysql_scanner)
+    ducq_skip_extension(mysql_scanner)
 endif()
 FetchContent_Declare(duckdb_ext
     GIT_REPOSITORY "https://github.com/duckdb/duckdb.git"
