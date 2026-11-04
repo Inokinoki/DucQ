@@ -77,7 +77,7 @@ cmake --build build
 - **线程模型**：每个数据库一个 worker `QThread`；查询在该线程通过 `duckdb_pending_prepared` + `duckdb_pending_execute_task` 驱动，UI 与查询层只经 queued signal/slot 通信；`duckdb_interrupt` 实现跨线程取消。
 - **结果访问**：执行完成后获得物化结果（2.0 中 `duckdb_pending_prepared` 默认物化），`duckdb_result` 所有权移交 UI 线程，`duckdb_value_*` 访问器惰性转换单元格——对任意向量布局（字典 / 压缩）安全，避免触碰原始 flat 指针。
 - **静态扩展**：DuckDB 2.0 的静态扩展（parquet/json/icu 等）需在 `duckdb_open` 前调用 `duckdb_register_static_extension(<ext>_describe)` 注册，见 `src/core/StaticExtensions.cpp`。
-- **远端数据库与额外后端**：`postgres_scanner`、`mysql_scanner`、`sqlite_scanner`、`httpfs`、`excel`、`fts`、`vss`、`ducklake`、`delta` 扩展从源码构建（预编译静态库包不含它们），以同样方式静态注册。CMake 逐一探测依赖，缺失时自动跳过对应扩展，保证各平台构建始终通过：`postgres_scanner` 需要 **libpq ≥ 18**（OAuth API），`excel` 需要 **minizip-ng**，`mysql_scanner` 需要 **libmariadb**（其 pinned CMake 只构建 loadable，DucQ 将其对象打包为静态归档并手写 describe 入口），`delta` 经 cargo 构建 Rust kernel。`iceberg` 已构建但未注册——其静态初始化会使进程启动时挂起。`spatial` 在 GDAL ≥ 3.13 下被跳过（pinned 代码基于旧版 GDAL VSI API）。
+- **远端数据库与额外后端**：`postgres_scanner`、`mysql_scanner`、`sqlite_scanner`、`httpfs`、`excel`、`fts`、`vss`、`ducklake`、`delta` 扩展从源码构建（预编译静态库包不含它们），以同样方式静态注册。CMake 逐一探测依赖，缺失时自动跳过对应扩展，保证各平台构建始终通过：`postgres_scanner` 需要 **libpq ≥ 18**（OAuth API），`excel` 需要 **minizip-ng**，`mysql_scanner` 需要 **libmariadb**（其 pinned CMake 只构建 loadable，DucQ 将其对象打包为静态归档并手写 describe 入口），`delta` 经 cargo 构建 Rust kernel（rustc 不可用时自动跳过）。`iceberg` 已构建但未注册——其静态初始化会使进程启动时挂起。`spatial` 在 GDAL ≥ 3.13 下被跳过（pinned 代码基于旧版 GDAL VSI API）。
 - **大结果集**：物化结果常驻内存，超大数据集请在 SQL 中加 `LIMIT`（导出走 `COPY`，服务端流式，不受影响）。
 
 ## Roadmap

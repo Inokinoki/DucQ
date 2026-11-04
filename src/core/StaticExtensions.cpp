@@ -9,11 +9,12 @@
 // linker, so no whole-archive tricks are needed. Registration must happen
 // before the first duckdb_open().
 //
-// duckdb_register_static_extensions() is the batch entry generated into the
-// engine archive (duckdb_static_extension_loader.c); referencing it extracts
-// the loader object with the describe functions of every extension statically
-// linked into the engine. mysql_scanner is NOT in that loader (DucQ packs it
-// itself) and is registered individually below.
+// duckdb_register_static_extensions() is the batch entry CMakeLists.txt
+// generates (stubs/ducq_extension_loader.c, an OBJECT library linked into
+// duckdb_bundle in both build modes); referencing it extracts the loader
+// object with the describe functions of every extension statically linked
+// into the binary. mysql_scanner is NOT in that loader (DucQ packs its
+// archive itself) and is registered individually below.
 //
 // NOT registered here: iceberg — its static init hangs the process on
 // startup (bisected; see git log). It is also absent from the engine's
