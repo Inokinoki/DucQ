@@ -30,6 +30,7 @@ private:
     void applyFilter();
 
     QString m_filter;
+    bool m_mixedCatalogs = false; // ATTACHed databases present alongside the local one
 };
 
 } // namespace ducq

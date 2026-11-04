@@ -14,6 +14,7 @@ struct ColumnInfo {
 };
 
 struct TableInfo {
+    QString catalog; // database the table lives in (memory / file / ATTACH alias)
     QString schema;
     QString name;
     QString type;

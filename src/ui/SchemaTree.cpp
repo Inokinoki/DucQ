@@ -9,6 +9,7 @@ namespace {
 constexpr int kRoleSchema = Qt::UserRole;
 constexpr int kRoleTable = Qt::UserRole + 1;
 constexpr int kRoleColumnName = Qt::UserRole + 2;
+constexpr int kRoleCatalog = Qt::UserRole + 3;
 } // namespace
 
 SchemaTree::SchemaTree(QWidget *parent)
@@ -24,7 +25,14 @@ SchemaTree::SchemaTree(QWidget *parent)
         const QString table = item->data(0, kRoleTable).toString();
         if (!table.isEmpty()) {
             const QString schema = item->data(0, kRoleSchema).toString();
-            emit tableActivated(quoteIdentifier(schema) + QLatin1Char('.') + quoteIdentifier(table));
+            QString qualified = quoteIdentifier(schema) + QLatin1Char('.') + quoteIdentifier(table);
+            if (m_mixedCatalogs) {
+                // With an ATTACHed database in the tree, a two-part name would
+                // resolve against the local catalog — qualify all tables.
+                const QString catalog = item->data(0, kRoleCatalog).toString();
+                qualified = quoteIdentifier(catalog) + QLatin1Char('.') + qualified;
+            }
+            emit tableActivated(qualified);
             return;
         }
         const QString column = item->data(0, kRoleColumnName).toString();
@@ -71,6 +79,16 @@ void SchemaTree::setCatalog(const QVector<TableInfo> &tables)
     }
 
     clear();
+    m_mixedCatalogs = false;
+    {
+        QString singleCatalog;
+        for (const TableInfo &table : tables) {
+            if (singleCatalog.isEmpty())
+                singleCatalog = table.catalog;
+            else if (table.catalog != singleCatalog)
+                m_mixedCatalogs = true;
+        }
+    }
     QHash<QString, QTreeWidgetItem *> itemsByKey;
     QHash<QString, QTreeWidgetItem *> schemaItems;
     for (const TableInfo &table : tables) {
@@ -88,6 +106,7 @@ void SchemaTree::setCatalog(const QVector<TableInfo> &tables)
         tableItem->setText(1, table.type);
         tableItem->setData(0, kRoleSchema, table.schema);
         tableItem->setData(0, kRoleTable, table.name);
+        tableItem->setData(0, kRoleCatalog, table.catalog);
         itemsByKey.insert(table.schema + QLatin1Char('.') + table.name, tableItem);
         for (const ColumnInfo &column : table.columns) {
             auto *columnItem = new QTreeWidgetItem(tableItem);
