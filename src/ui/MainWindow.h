@@ -19,10 +19,12 @@ class QLineEdit;
 class QMenu;
 class QProgressBar;
 class QPushButton;
+class QSettings;
 class QSplitter;
 class QThread;
 class QToolButton;
 class QTranslator;
+class QTabWidget;
 
 namespace ducq {
 
@@ -49,6 +51,7 @@ protected:
     void closeEvent(QCloseEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dropEvent(QDropEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private slots:
     void newDatabaseFile();
@@ -97,6 +100,18 @@ private:
                       bool recordHistory = false);
     void updateHistoryCombo();
     void saveHistory();
+    // Query tabs: one independent SQL buffer per tab. The editor per tab is
+    // self-contained (highlighting, find bar, undo); run/history/session stay
+    // window-global and act on the active tab. A tab's "clean" text (its
+    // property "cleanText") is what was last executed or restored — closing
+    // a tab with edits on top asks first, and the app close persists all
+    // tabs instead.
+    SqlEditor *activeEditor() const;
+    SqlEditor *newQueryTab(const QString &title = {}, const QString &sql = {});
+    void closeQueryTab(int index);
+    void renameQueryTab(int index);
+    void saveQueryTabs(QSettings *settings);
+    void restoreQueryTabs(QSettings *settings);
 #ifdef DUCQ_QUACK
     QStringList quackRecentTargets() const;
     void rememberQuackTarget(const QString &server);
@@ -111,7 +126,7 @@ private:
 
     QTranslator *m_translator = nullptr;
     SchemaTree *m_schemaTree = nullptr;
-    SqlEditor *m_editor = nullptr;
+    QTabWidget *m_editorTabs = nullptr;
     ResultTabs *m_resultTabs = nullptr;
     QComboBox *m_sessionCombo = nullptr;
     QComboBox *m_historyCombo = nullptr;
@@ -159,6 +174,7 @@ private:
     QHash<int, quint64> m_runningQueries; // sessionId -> running queryId
     int m_busyIndicatorSid = -1;          // session the progress bar / cancel act on
     int m_lastStartedSid = -1;
+    int m_nextQueryTab = 1;               // counter for default tab titles
     QHash<quint64, QString> m_followUps;
     QHash<quint64, QString> m_pendingHistory; // queryId -> sql, recorded on success
     QStringList m_history;

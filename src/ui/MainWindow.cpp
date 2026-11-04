@@ -28,12 +28,14 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QInputDialog>
 #include <QLineEdit>
 #include <QLabel>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMetaObject>
 #include <QMimeData>
+#include <QMouseEvent>
 #include <QProgressBar>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -42,6 +44,8 @@
 #include <QShortcut>
 #include <QSplitter>
 #include <QStatusBar>
+#include <QTabBar>
+#include <QTabWidget>
 #include <QTimer>
 #include <QThread>
 #include <QToolBar>
@@ -92,6 +96,8 @@ MainWindow::MainWindow(const QString &startupDatabase)
 
     buildUi();
     restoreWindowState();
+    if (m_editorTabs->count() == 0)
+        newQueryTab(); // nothing restored: start with a single empty tab
     m_translator = new QTranslator(this);
     buildLanguageMenu();
 
@@ -125,7 +131,18 @@ void MainWindow::buildUi()
     schemaLayout->addWidget(m_schemaFilter);
     schemaLayout->addWidget(m_schemaTree, 1);
 
-    m_editor = new SqlEditor;
+    m_editorTabs = new QTabWidget;
+    m_editorTabs->setTabsClosable(true);
+    m_editorTabs->setMovable(true);
+    m_editorTabs->setDocumentMode(true);
+    connect(m_editorTabs, &QTabWidget::tabCloseRequested, this, &MainWindow::closeQueryTab);
+    connect(m_editorTabs, &QTabWidget::currentChanged, this, [this](int) { updateCursorPos(); });
+    m_editorTabs->tabBar()->installEventFilter(this);
+    auto *newTabButton = new QToolButton;
+    newTabButton->setText(QStringLiteral("+"));
+    connect(newTabButton, &QToolButton::clicked, this, [this] { newQueryTab(); });
+    m_editorTabs->setCornerWidget(newTabButton, Qt::TopRightCorner);
+
     m_resultTabs = new ResultTabs(kDefaultDisplayRowLimit);
     m_sessionCombo = new QComboBox;
     // Size to the longest connection name so large system fonts don't clip
@@ -142,14 +159,14 @@ void MainWindow::buildUi()
     m_historyCombo->setEnabled(false);
     connect(m_historyCombo, &QComboBox::activated, this, [this](int index) {
         if (index >= 0 && index < m_history.size()) {
-            m_editor->replaceText(m_history.at(index));
+            if (SqlEditor *editor = activeEditor())
+                editor->replaceText(m_history.at(index));
             m_historyCombo->setToolTip(m_history.at(index));
         }
     });
 
     m_runButton = new QPushButton;
     connect(m_runButton, &QPushButton::clicked, this, &MainWindow::runEditorSql);
-    connect(m_editor, &SqlEditor::executeRequested, this, &MainWindow::runEditorSql);
 
     auto *editorBar = new QWidget;
     auto *editorBarLayout = new QHBoxLayout(editorBar);
@@ -163,7 +180,7 @@ void MainWindow::buildUi()
     editorLayout->setContentsMargins(0, 0, 0, 0);
     editorLayout->setSpacing(0);
     editorLayout->addWidget(editorBar);
-    editorLayout->addWidget(m_editor, 1);
+    editorLayout->addWidget(m_editorTabs, 1);
 
     m_verticalSplitter = new QSplitter(Qt::Vertical);
     m_verticalSplitter->addWidget(editorPane);
@@ -184,10 +201,12 @@ void MainWindow::buildUi()
     connect(m_resultTabs, &QTabWidget::currentChanged, this, [this](int) { updateBusyIndicator(); });
 
     connect(m_schemaTree, &SchemaTree::tableActivated, this, [this](const QString &qualifiedName) {
-        m_editor->replaceText(QStringLiteral("SELECT * FROM %1 LIMIT 100;").arg(qualifiedName));
+        if (SqlEditor *editor = activeEditor())
+            editor->replaceText(QStringLiteral("SELECT * FROM %1 LIMIT 100;").arg(qualifiedName));
     });
     connect(m_schemaTree, &SchemaTree::columnActivated, this, [this](const QString &columnName) {
-        m_editor->editorWidget()->insertPlainText(quoteIdentifier(columnName));
+        if (SqlEditor *editor = activeEditor())
+            editor->editorWidget()->insertPlainText(quoteIdentifier(columnName));
     });
     connect(m_schemaTree, &SchemaTree::refreshRequested, this, &MainWindow::refreshCatalog);
 
@@ -271,8 +290,13 @@ void MainWindow::buildUi()
     connect(nextConnectionShortcut, &QShortcut::activated, this, [this] { cycleSession(1); });
     auto *prevConnectionShortcut = new QShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+Tab")), this);
     connect(prevConnectionShortcut, &QShortcut::activated, this, [this] { cycleSession(-1); });
-    connect(m_editor->editorWidget(), &QPlainTextEdit::cursorPositionChanged, this,
-            &MainWindow::updateCursorPos);
+    // Ctrl+T opens a query tab; Cmd/Ctrl+W closes the active one. Cursor
+    // position tracking is wired per editor in newQueryTab().
+    auto *newTabShortcut = new QShortcut(QKeySequence(QStringLiteral("Ctrl+T")), this);
+    connect(newTabShortcut, &QShortcut::activated, this, [this] { newQueryTab(); });
+    auto *closeTabShortcut = new QShortcut(QKeySequence::Close, this);
+    connect(closeTabShortcut, &QShortcut::activated, this,
+            [this] { closeQueryTab(m_editorTabs->currentIndex()); });
 
     // Icons and menus need every widget above to exist first.
     applyIcons();
@@ -327,7 +351,8 @@ void MainWindow::applyIcons()
 
 void MainWindow::refreshThemeDependentUi()
 {
-    m_editor->retheme();
+    for (int i = 0; i < m_editorTabs->count(); ++i)
+        qobject_cast<SqlEditor *>(m_editorTabs->widget(i))->retheme();
     m_resultTabs->retheme();
     applyIcons();
     if (m_statusIsError)
@@ -347,9 +372,114 @@ void MainWindow::cycleSession(int direction)
 
 void MainWindow::updateCursorPos()
 {
-    const QTextCursor cursor = m_editor->editorWidget()->textCursor();
+    const SqlEditor *editor = activeEditor();
+    if (!editor) {
+        m_cursorPosLabel->clear();
+        return;
+    }
+    const QTextCursor cursor = editor->editorWidget()->textCursor();
     m_cursorPosLabel->setText(tr("Ln %L1, Col %L2").arg(cursor.blockNumber() + 1)
                                   .arg(cursor.positionInBlock() + 1));
+}
+
+SqlEditor *MainWindow::activeEditor() const
+{
+    return m_editorTabs ? qobject_cast<SqlEditor *>(m_editorTabs->currentWidget()) : nullptr;
+}
+
+SqlEditor *MainWindow::newQueryTab(const QString &title, const QString &sql)
+{
+    auto *editor = new SqlEditor;
+    connect(editor, &SqlEditor::executeRequested, this, &MainWindow::runEditorSql);
+    connect(editor->editorWidget(), &QPlainTextEdit::cursorPositionChanged, this,
+            &MainWindow::updateCursorPos);
+    editor->setPlainText(sql);
+    editor->setProperty("cleanText", sql); // restored/empty content is the baseline
+
+    const int index = m_editorTabs->addTab(editor, title);
+    if (title.isEmpty()) {
+        editor->setProperty("autoTitleNum", m_nextQueryTab);
+        m_editorTabs->setTabText(index, tr("Query %1").arg(m_nextQueryTab));
+        ++m_nextQueryTab;
+    }
+    m_editorTabs->setCurrentIndex(index);
+    return editor;
+}
+
+void MainWindow::closeQueryTab(int index)
+{
+    if (index < 0 || index >= m_editorTabs->count())
+        return;
+    auto *editor = qobject_cast<SqlEditor *>(m_editorTabs->widget(index));
+    if (editor && editor->toPlainText() != editor->property("cleanText").toString()) {
+        // The app close persists every tab; an explicit close discards, so
+        // confirm when content was never executed or was edited afterwards.
+        const QMessageBox::StandardButton answer = QMessageBox::question(
+            this, tr("Close Query Tab"),
+            tr("This tab has changes that were not executed and will be lost. Close anyway?"));
+        if (answer != QMessageBox::Yes)
+            return;
+    }
+    delete m_editorTabs->widget(index);
+    if (m_editorTabs->count() == 0)
+        newQueryTab(); // never leave the window without an editor
+}
+
+void MainWindow::renameQueryTab(int index)
+{
+    if (index < 0 || index >= m_editorTabs->count())
+        return;
+    QInputDialog dialog(this);
+    dialog.setWindowTitle(tr("Rename Tab"));
+    dialog.setLabelText(tr("Tab name:"));
+    dialog.setTextValue(m_editorTabs->tabText(index));
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    const QString name = dialog.textValue().trimmed();
+    if (name.isEmpty())
+        return;
+    m_editorTabs->setTabText(index, name);
+    m_editorTabs->widget(index)->setProperty("autoTitleNum", 0); // no longer auto-named
+}
+
+void MainWindow::saveQueryTabs(QSettings *settings)
+{
+    settings->beginWriteArray(QStringLiteral("queryTabs"));
+    const int count = m_editorTabs->count();
+    for (int i = 0; i < count; ++i) {
+        settings->setArrayIndex(i);
+        settings->setValue(QStringLiteral("title"), m_editorTabs->tabText(i));
+        settings->setValue(QStringLiteral("sql"),
+                           qobject_cast<SqlEditor *>(m_editorTabs->widget(i))->toPlainText());
+    }
+    settings->endArray();
+    settings->setValue(QStringLiteral("queryTabs/active"), m_editorTabs->currentIndex());
+}
+
+void MainWindow::restoreQueryTabs(QSettings *settings)
+{
+    const int size = settings->beginReadArray(QStringLiteral("queryTabs"));
+    for (int i = 0; i < size; ++i) {
+        settings->setArrayIndex(i);
+        const QString sql = settings->value(QStringLiteral("sql")).toString();
+        // The stored sql is the restored baseline; the tab starts out clean.
+        SqlEditor *editor = newQueryTab(settings->value(QStringLiteral("title")).toString(), sql);
+        editor->setProperty("cleanText", sql);
+    }
+    settings->endArray();
+    const int active = settings->value(QStringLiteral("queryTabs/active")).toInt();
+    if (active > 0 && active < m_editorTabs->count())
+        m_editorTabs->setCurrentIndex(active);
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+    // Double-clicking a tab renames it.
+    if (m_editorTabs && watched == m_editorTabs->tabBar() && event->type() == QEvent::MouseButtonDblClick) {
+        renameQueryTab(m_editorTabs->tabBar()->tabAt(static_cast<QMouseEvent *>(event)->pos()));
+        return true;
+    }
+    return QMainWindow::eventFilter(watched, event);
 }
 
 void MainWindow::buildLanguageMenu()
@@ -391,7 +521,8 @@ void MainWindow::applyLanguage(const QString &code, bool saveSetting)
     retranslateUi();
     m_resultTabs->retranslateUi();
     m_schemaTree->retranslateUi();
-    m_editor->retranslateUi();
+    for (int i = 0; i < m_editorTabs->count(); ++i)
+        qobject_cast<SqlEditor *>(m_editorTabs->widget(i))->retranslateUi();
 }
 
 void MainWindow::changeEvent(QEvent *event)
@@ -430,6 +561,15 @@ void MainWindow::retranslateUi()
     m_exportParquetAction->setText(tr("Export Current Results as Parquet…"));
     m_closeTabAction->setText(tr("Close Result Tab"));
     m_quitAction->setText(tr("Exit"));
+    if (auto *button = qobject_cast<QToolButton *>(m_editorTabs->cornerWidget(Qt::TopRightCorner)))
+        button->setToolTip(tr("New query tab (Ctrl+T)"));
+    // Default tab titles retranslate; user-renamed ones (autoTitleNum == 0)
+    // stay untouched.
+    for (int i = 0; i < m_editorTabs->count(); ++i) {
+        const int num = m_editorTabs->widget(i)->property("autoTitleNum").toInt();
+        if (num > 0)
+            m_editorTabs->setTabText(i, tr("Query %1").arg(num));
+    }
     m_queryMenu->setTitle(tr("&Query"));
     m_runAction->setText(tr("&Run SQL"));
     m_languageMenu->setTitle(tr("&Language"));
@@ -753,13 +893,19 @@ void MainWindow::exportCurrentResult(const QString &format)
 
 void MainWindow::runEditorSql()
 {
+    SqlEditor *editor = activeEditor();
+    if (!editor)
+        return;
     // With a selection, run just the selected statements; otherwise all SQL.
-    const QString selection = m_editor->selectedText();
-    const QString sql = (selection.isEmpty() ? m_editor->toPlainText() : selection).trimmed();
+    const QString selection = editor->selectedText();
+    const QString sql = (selection.isEmpty() ? editor->toPlainText() : selection).trimmed();
     if (sql.isEmpty()) {
         setStatusMessage(tr("No SQL to execute"));
         return;
     }
+    // The full buffer is the baseline a close-prompt compares against: after
+    // running, edits on top of what was executed count as unsaved changes.
+    editor->setProperty("cleanText", editor->toPlainText());
     runOnSession(m_activeSession, sql, {}, true);
 }
 
@@ -938,6 +1084,7 @@ void MainWindow::restoreWindowState()
     const QByteArray vertical = settings->value(QStringLiteral("window/vSplitter")).toByteArray();
     if (!vertical.isEmpty())
         m_verticalSplitter->restoreState(vertical);
+    restoreQueryTabs(settings.get());
 }
 
 void MainWindow::saveWindowState()
@@ -946,6 +1093,7 @@ void MainWindow::saveWindowState()
     settings->setValue(QStringLiteral("window/geometry"), saveGeometry());
     settings->setValue(QStringLiteral("window/hSplitter"), m_horizontalSplitter->saveState());
     settings->setValue(QStringLiteral("window/vSplitter"), m_verticalSplitter->saveState());
+    saveQueryTabs(settings.get());
 }
 
 void MainWindow::executeScriptAtStartup(const QString &scriptPath)
@@ -956,7 +1104,10 @@ void MainWindow::executeScriptAtStartup(const QString &scriptPath)
         return;
     }
     const QString sql = QString::fromUtf8(scriptFile.readAll());
-    m_editor->setPlainText(sql);
+    if (SqlEditor *editor = activeEditor()) {
+        editor->setPlainText(sql);
+        editor->setProperty("cleanText", sql);
+    }
     runOnSession(m_activeSession, sql, {}, true);
 }
 

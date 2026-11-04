@@ -35,6 +35,7 @@ A cross-platform [DuckDB](https://duckdb.org) desktop client — pure C++ / Qt W
 - Multiple simultaneous connections, each with its own worker thread — switch via the selector next to Run or `Ctrl+Tab` (SQL-level `ATTACH` works too)
 - Schema tree: tables / views / columns grouped by schema, name filter, double-click to generate a `SELECT`
 - SQL editor: syntax highlighting, line numbers, find & replace (`Ctrl+F`), run the selection or the whole buffer with `Ctrl+Enter`
+- **Query tabs**: several independent SQL buffers side by side (`Ctrl+T` new, `Ctrl+W` close, double-click to rename) — contents are restored across restarts, and closing a tab with unexecuted edits asks first
 - Result table: virtualized rendering (first 1,000,000 rows by default, marked "truncated" beyond), click-to-sort, copy cell/row/selection as TSV
 - Light / dark theme, following the system appearance (View → Theme)
 - Query progress bar + cancel at any time (`duckdb_interrupt`)
