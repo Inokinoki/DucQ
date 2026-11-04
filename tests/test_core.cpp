@@ -33,6 +33,10 @@ private slots:
     void testTwoSessions();
     void testCloseDuringRunningQuery();
     void testHistoryStore();
+#ifdef DUCQ_QUACK
+    void testQuackRegistered();
+    void testQuackLoopback();
+#endif
 
 private:
     void runAndWait(const QString &sql, qsizetype displayRowLimit = kDefaultDisplayRowLimit);
@@ -360,6 +364,100 @@ void TestCore::testHistoryStore()
     HistoryStore::save(&store, QStringList());
     QVERIFY(HistoryStore::load(&store).isEmpty());
 }
+
+#ifdef DUCQ_QUACK
+
+void TestCore::testQuackRegistered()
+{
+    // Static mode registers quack and httpfs into the engine (installed and
+    // loaded); dynamic mode LOADs them from the extensions directory
+    // collected next to the test binary, which sets loaded but not installed
+    // (INSTALL tracks repository copies, not LOADs). Alphabetical order:
+    // httpfs, then quack.
+    runAndWait(QStringLiteral(
+        "SELECT extension_name, installed, loaded FROM duckdb_extensions() "
+        "WHERE extension_name IN ('quack', 'httpfs') ORDER BY extension_name;"));
+    QVERIFY2(m_error.isEmpty(), qPrintable(m_error));
+    QCOMPARE(m_totalRows, qsizetype(2));
+    QCOMPARE(m_cache.cell(0, 2).toBool(), true); // httpfs loaded
+    QCOMPARE(m_cache.cell(1, 2).toBool(), true); // quack loaded
+#ifdef DUCQ_DYNAMIC_EXTENSIONS
+    QCOMPARE(m_cache.cell(0, 1).toBool(), false); // httpfs installed
+    QCOMPARE(m_cache.cell(1, 1).toBool(), false); // quack installed
+#else
+    QCOMPARE(m_cache.cell(0, 1).toBool(), true); // httpfs installed
+    QCOMPARE(m_cache.cell(1, 1).toBool(), true); // quack installed
+#endif
+}
+
+void TestCore::testQuackLoopback()
+{
+    // Full client-server round trip in one process: serve an in-memory
+    // database, attach a second session to it (the bootstrap DucQ's
+    // server-connect uses), and read/write through the alias.
+    runAndWait(QStringLiteral("CREATE OR REPLACE TABLE quack_src AS SELECT range AS i FROM range(10);"));
+    QVERIFY2(m_error.isEmpty(), qPrintable(m_error));
+
+    runAndWait(QStringLiteral(
+        "CALL quack_serve('quack:localhost:19494', token => 'ducq-test-token');"));
+    if (!m_error.isEmpty())
+        QSKIP(qPrintable(QStringLiteral("could not start the quack server: %1").arg(m_error)));
+
+    DbSession client(999);
+    QString error;
+    const bool opened = client.open(QString(),
+                                    QStringLiteral("ATTACH 'quack:localhost:19494' AS remote (TOKEN "
+                                                   "'ducq-test-token');"),
+                                    QStringLiteral("localhost:19494"), QStringLiteral("quack:localhost:19494"),
+                                    &error);
+    if (!opened) {
+        // Never leave a server behind on a skip path.
+        runAndWait(QStringLiteral("CALL quack_stop('quack:localhost:19494');"));
+        QSKIP(qPrintable(QStringLiteral("could not attach to the quack server: %1").arg(error)));
+    }
+    QCOMPARE(client.displayName(), QStringLiteral("localhost:19494"));
+
+    quint64 done = 0;
+    qint64 count = -1;
+    quint64 writeDone = 0;
+    QString writeError;
+    connect(client.runner(), &QueryRunner::resultReady, &client,
+            [&done, &count](quint64, quintptr resultPtr, const QVector<ducq::ColumnMeta> &columns) {
+                ResultCache cache;
+                cache.reset(reinterpret_cast<duckdb_result *>(resultPtr), columns, kDefaultDisplayRowLimit);
+                count = cache.cell(0, 0).toLongLong();
+                done = 1;
+            });
+    connect(client.runner(), &QueryRunner::finished, &client,
+            [&writeDone, &writeError](quint64, qint64, qsizetype, bool, const QString &error) {
+                writeError = error;
+                writeDone = 1;
+            });
+    // Reads run remotely through the attached alias.
+    client.runSql(++m_nextQueryId, QStringLiteral("SELECT count(*) FROM remote.main.quack_src;"));
+    QTRY_COMPARE_WITH_TIMEOUT(writeDone, quint64(1), 30000); // finished: fast failure
+    QVERIFY2(writeError.isEmpty(), qPrintable(writeError));
+    QTRY_COMPARE_WITH_TIMEOUT(done, quint64(1), 30000); // resultReady follows finished
+    QCOMPARE(count, qint64(10));
+
+    // Writes go to the server too: the table appears on the serving side.
+    writeDone = 0;
+    client.runSql(++m_nextQueryId,
+                  QStringLiteral("CREATE TABLE remote.main.quack_written AS SELECT i * 2 AS j FROM "
+                                 "remote.main.quack_src;"));
+    QTRY_COMPARE_WITH_TIMEOUT(writeDone, quint64(1), 30000);
+    QVERIFY2(writeError.isEmpty(), qPrintable(writeError));
+    runAndWait(QStringLiteral("SELECT count(*) FROM quack_written;"));
+    QVERIFY2(m_error.isEmpty(), qPrintable(m_error));
+    QCOMPARE(m_totalRows, qsizetype(1));
+    QCOMPARE(m_cache.cell(0, 0).toLongLong(), qint64(10));
+
+    client.close();
+    runAndWait(QStringLiteral("CALL quack_stop('quack:localhost:19494');"));
+    QVERIFY2(m_error.isEmpty(), qPrintable(m_error));
+}
+
+#endif // DUCQ_QUACK
 
 QTEST_GUILESS_MAIN(TestCore)
 #include "test_core.moc"

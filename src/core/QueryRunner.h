@@ -35,6 +35,13 @@ public slots:
     void shutdown();   // runs in the worker thread: closes the connection
     void execute(quint64 queryId, const QString &sql);
     void refreshCatalog();
+    // Runs setup SQL (e.g. ATTACH + CONNECT for a remote session) on the
+    // worker connection. Meant to be invoked BlockingQueuedConnection from
+    // open(); success and the error text land in the members below, which
+    // are safe to read once the blocking call returns.
+    void bootstrap(const QString &sql);
+    bool bootstrapOk() const { return m_bootstrapOk; }
+    QString bootstrapError() const { return m_bootstrapError; }
 
 signals:
     // resultPtr points to a heap duckdb_result; the receiver takes ownership.
@@ -54,6 +61,8 @@ private:
     Database *m_database = nullptr;
     duckdb_connection m_connection = nullptr;
     std::atomic_bool m_cancelRequested { false };
+    bool m_bootstrapOk = true;
+    QString m_bootstrapError;
 };
 
 } // namespace ducq

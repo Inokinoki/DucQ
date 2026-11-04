@@ -10,8 +10,12 @@
 #include "core/DbSession.h"
 #include "core/HistoryStore.h"
 #include "core/QueryRunner.h"
+#include "core/QuackTargets.h"
 #include "core/ResultCache.h"
 #include "export/Exporter.h"
+#ifdef DUCQ_QUACK
+#include "QuackConnectDialog.h"
+#endif
 
 #include <QActionGroup>
 #include <QApplication>
@@ -194,6 +198,10 @@ void MainWindow::buildUi()
     connect(m_openAction, &QAction::triggered, this, [this] { openDatabaseFile(); });
     m_newMemoryAction = m_fileMenu->addAction(QString());
     connect(m_newMemoryAction, &QAction::triggered, this, &MainWindow::newInMemoryConnection);
+#ifdef DUCQ_QUACK
+    m_quackConnectAction = m_fileMenu->addAction(QString());
+    connect(m_quackConnectAction, &QAction::triggered, this, &MainWindow::connectQuackServer);
+#endif
     m_closeConnectionAction = m_fileMenu->addAction(QString());
     connect(m_closeConnectionAction, &QAction::triggered, this, &MainWindow::closeConnection);
     m_fileMenu->addSeparator();
@@ -409,6 +417,9 @@ void MainWindow::retranslateUi()
     m_newAction->setText(tr("New Database…"));
     m_openAction->setText(tr("Open Database…"));
     m_newMemoryAction->setText(tr("New In-Memory Connection"));
+#ifdef DUCQ_QUACK
+    m_quackConnectAction->setText(tr("Connect to DuckDB Server…"));
+#endif
     m_closeConnectionAction->setText(tr("Close Connection"));
     m_exportCsvAction->setText(tr("Export Current Results as CSV…"));
     m_exportParquetAction->setText(tr("Export Current Results as Parquet…"));
@@ -434,11 +445,12 @@ void MainWindow::retranslateUi()
     updateConnectionLabel();
 }
 
-DbSession *MainWindow::createSession(const QString &path)
+DbSession *MainWindow::createSession(const QString &path, const QString &bootstrapSql,
+                                     const QString &displayName, const QString &remoteTarget)
 {
     auto *session = new DbSession(m_nextSessionId++, this);
     QString error;
-    if (!session->open(path, &error)) {
+    if (!session->open(path, bootstrapSql, displayName, remoteTarget, &error)) {
         QMessageBox::critical(this, tr("Open Failed"), error);
         delete session;
         return nullptr;
@@ -481,6 +493,8 @@ void MainWindow::activateSession(DbSession *session)
 
 QString MainWindow::displayNameFor(DbSession *session) const
 {
+    if (!session->displayName().isEmpty())
+        return session->displayName();
     if (session->isInMemory())
         return tr("In-memory database");
     return QFileInfo(session->path()).fileName();
@@ -557,6 +571,58 @@ void MainWindow::newInMemoryConnection()
     if (DbSession *session = createSession(QString()))
         activateSession(session);
 }
+
+#ifdef DUCQ_QUACK
+
+QStringList MainWindow::quackRecentTargets() const
+{
+    std::unique_ptr<QSettings> settings(ducq::AppSettings::create());
+    return ducq::QuackTargets::load(settings.get());
+}
+
+void MainWindow::rememberQuackTarget(const QString &server)
+{
+    std::unique_ptr<QSettings> settings(ducq::AppSettings::create());
+    ducq::QuackTargets::save(settings.get(), ducq::QuackTargets::push(quackRecentTargets(), server));
+}
+
+void MainWindow::connectQuackServer()
+{
+    QuackConnectDialog dialog(this);
+    dialog.setRecentTargets(quackRecentTargets());
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    const QString server = dialog.server();
+    const QString token = dialog.token();
+    const QString target = QStringLiteral("quack:") + server;
+    // Reuse an existing connection to the same server instead of attaching it
+    // a second time (ATTACH of the same quack database twice is refused).
+    for (DbSession *session : m_sessions) {
+        if (session->remoteTarget() == target) {
+            activateSession(session);
+            setStatusMessage(tr("Already connected: %1").arg(session->displayName()));
+            return;
+        }
+    }
+    // ATTACH makes the remote database part of the local catalog: its tables
+    // appear in the schema tree and queries address them through the alias
+    // (e.g. FROM remote.main.t) with filtering pushed down to the server.
+    // (DuckDB 2.0's CONNECT would route whole sessions, but it conflicts with
+    // the prepared-statement API the query layer is built on.)
+    QString bootstrap = QStringLiteral("ATTACH '%1' AS %2").arg(target, dialog.alias());
+    if (!token.isEmpty())
+        bootstrap += QStringLiteral(" (TOKEN '%1')").arg(QString(token).replace(u'\'', QStringLiteral("''")));
+    bootstrap += QLatin1Char(';');
+
+    DbSession *session = createSession(QString(), bootstrap, server, target);
+    if (!session)
+        return;
+    activateSession(session);
+    rememberQuackTarget(server);
+    setStatusMessage(tr("Connected to %1").arg(server));
+}
+
+#endif // DUCQ_QUACK
 
 void MainWindow::closeConnection()
 {

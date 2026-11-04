@@ -52,6 +52,9 @@ private slots:
     void openDatabaseFile();
     void openDatabaseFile(const QString &file);
     void newInMemoryConnection();
+#ifdef DUCQ_QUACK
+    void connectQuackServer();
+#endif
     void closeConnection();
     void switchSession(int sessionId);
     void exportCurrentResult(const QString &format);
@@ -79,7 +82,8 @@ private:
     void cycleSession(int direction);
     void updateCursorPos();
 
-    DbSession *createSession(const QString &path);
+    DbSession *createSession(const QString &path, const QString &bootstrapSql = {},
+                             const QString &displayName = {}, const QString &remoteTarget = {});
     void activateSession(ducq::DbSession *session);
     void closeActiveConnection();
     DbSession *sessionById(int sessionId) const;
@@ -89,6 +93,10 @@ private:
                       bool recordHistory = false);
     void updateHistoryCombo();
     void saveHistory();
+#ifdef DUCQ_QUACK
+    QStringList quackRecentTargets() const;
+    void rememberQuackTarget(const QString &server);
+#endif
     void setStatusMessage(const QString &message);
     void setStatusError(const QString &message);
     void updateBusyIndicator();
@@ -123,6 +131,9 @@ private:
     QAction *m_newAction = nullptr;
     QAction *m_openAction = nullptr;
     QAction *m_newMemoryAction = nullptr;
+#ifdef DUCQ_QUACK
+    QAction *m_quackConnectAction = nullptr;
+#endif
     QAction *m_closeConnectionAction = nullptr;
     QAction *m_exportCsvAction = nullptr;
     QAction *m_exportParquetAction = nullptr;

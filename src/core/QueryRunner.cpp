@@ -41,6 +41,52 @@ void QueryRunner::shutdown()
     }
 }
 
+void QueryRunner::bootstrap(const QString &sql)
+{
+    m_bootstrapOk = false;
+    m_bootstrapError.clear();
+    if (!m_connection) {
+        m_bootstrapError = tr("Database connection not initialized");
+        return;
+    }
+    duckdb_extracted_statements extracted = nullptr;
+    const QByteArray utf8 = sql.toUtf8();
+    const idx_t statementCount = duckdb_extract_statements(m_connection, utf8.constData(), &extracted);
+    if (statementCount == 0) {
+        const char *extractError = duckdb_extract_statements_error(extracted);
+        m_bootstrapError = extractError ? QString::fromUtf8(extractError) : tr("Failed to parse the SQL");
+    } else {
+        for (idx_t i = 0; i < statementCount; ++i) {
+            duckdb_prepared_statement statement = nullptr;
+            if (duckdb_prepare_extracted_statement(m_connection, extracted, i, &statement) != DuckDBSuccess) {
+                const char *prepareError = duckdb_prepare_error(statement);
+                m_bootstrapError = tr("Statement %1/%2: %3")
+                                       .arg(i + 1)
+                                       .arg(int(statementCount))
+                                       .arg(prepareError ? QString::fromUtf8(prepareError) : tr("prepare failed"));
+                break;
+            }
+            duckdb_result result {};
+            const duckdb_state state = duckdb_execute_prepared(statement, &result);
+            if (state != DuckDBSuccess) {
+                const char *execError = duckdb_result_error(&result);
+                m_bootstrapError = tr("Statement %1/%2: %3")
+                                       .arg(i + 1)
+                                       .arg(int(statementCount))
+                                       .arg(execError ? QString::fromUtf8(execError) : tr("Execution failed"));
+            }
+            duckdb_destroy_prepare(&statement);
+            duckdb_destroy_result(&result);
+            if (state != DuckDBSuccess)
+                break;
+            m_bootstrapOk = true;
+        }
+    }
+    duckdb_destroy_extracted(&extracted);
+    if (!m_bootstrapOk && m_bootstrapError.isEmpty())
+        m_bootstrapError = tr("Execution failed");
+}
+
 void QueryRunner::emitProgressThrottled(quint64 queryId, const QElapsedTimer &timer, qint64 &lastEmitMs)
 {
     const qint64 now = timer.elapsed();

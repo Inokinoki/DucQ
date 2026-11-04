@@ -68,8 +68,18 @@ include(FetchContent)
 option(DUCQ_DYNAMIC_EXTENSIONS
        "Build the DuckDB engine from source with dynamic extension loading enabled"
        OFF)
+# Quack turns DuckDB into a client-server database: ATTACH 'quack:host' +
+# CONNECT routes a session to a remote duckdb process. Purely additive (its
+# HTTP/TLS transport is httpfs, already linked), so it is on by default;
+# -DDUCQ_QUACK=OFF builds a binary with no quack code and no server-connect UI.
+option(DUCQ_QUACK
+       "Include the Quack client-server extension (remote DuckDB server connections)"
+       ON)
 
 add_library(duckdb_bundle INTERFACE)
+if(DUCQ_QUACK)
+    target_compile_definitions(duckdb_bundle INTERFACE DUCQ_QUACK=1)
+endif()
 
 if(NOT DUCQ_DYNAMIC_EXTENSIONS)
 FetchContent_Declare(duckdb_headers
@@ -159,6 +169,7 @@ endif()
 #   httpfs           — read parquet/csv/json over HTTP(S), S3, R2, GCS, Azure
 #   excel            — read_xlsx() for Excel files
 #   fts / vss        — full-text search / vector similarity search
+#   quack            — DuckDB's client-server protocol (only with DUCQ_QUACK)
 #
 # DuckDB's own root CMake fetches each repo at the pinned, v2.0.0-compatible
 # commit via BUILD_EXTENSIONS; BUILD_EXTENSIONS_ONLY skips rebuilding the
@@ -180,6 +191,11 @@ set(DUCKDB_OOTE_SOURCES
     delta
     mysql_scanner
     spatial)
+# Quack is fetched from the repo pinned in DuckDB's own
+# .github/config/extensions/quack.cmake, exactly like httpfs/excel above.
+if(DUCQ_QUACK)
+    list(APPEND DUCKDB_OOTE_SOURCES quack)
+endif()
 # Dynamic mode also builds the three in-tree extensions that the prebuilt
 # bundle ships but a source build must compile itself.
 set(DUCKDB_EXT_SOURCES ${DUCKDB_OOTE_SOURCES})
@@ -413,6 +429,23 @@ if(NOT TARGET duckdb_static)
 endif()
 endif()
 FetchContent_MakeAvailable(duckdb_ext)
+
+# The pinned quack commit predates OpenSSL 4's constification of
+# X509_get_subject_name (returns const X509_NAME* from 4.0 on, X509_NAME*
+# before); a const_cast keeps both toolchains building. Replace is idempotent,
+# so re-configure runs stay clean. (Same pattern as the mysql source patch
+# below.) The extension source exists only once DuckDB's own configure fetched
+# it, hence the placement after FetchContent_MakeAvailable.
+set(_quack_keygen "${CMAKE_BINARY_DIR}/_deps/quack_extension_fc-src/src/quack_ssl_key_generator.cpp")
+if(DUCQ_QUACK AND EXISTS "${_quack_keygen}")
+    file(READ "${_quack_keygen}" _quack_content)
+    string(REPLACE "X509_name_st *name = X509_get_subject_name(cert.get());"
+                   "X509_NAME *name = const_cast<X509_NAME *>(X509_get_subject_name(cert.get()));"
+                   _quack_content "${_quack_content}")
+    file(WRITE "${_quack_keygen}" "${_quack_content}")
+    unset(_quack_content)
+endif()
+unset(_quack_keygen)
 
 # ---------------------------------------------------------------------------
 # Generated static-extension loader (both build modes).
@@ -694,6 +727,15 @@ int32_t duckdb_extension_mysql_scanner_describe(duckdb_extension_descriptor *des
             else()
                 target_link_libraries(duckdb_bundle INTERFACE ssl crypto)
             endif()
+        elseif(_name STREQUAL "quack")
+            # Quack rides on httpfs' HTTP/TLS stack; same PRIVATE-linking
+            # situation for its TLS backend.
+            find_package(OpenSSL QUIET)
+            if(OpenSSL_FOUND)
+                target_link_libraries(duckdb_bundle INTERFACE OpenSSL::SSL OpenSSL::Crypto)
+            else()
+                target_link_libraries(duckdb_bundle INTERFACE ssl crypto)
+            endif()
         endif()
     else()
         message(STATUS "DucQ: remote-db extension ${_name} not built (skipped)")
@@ -710,6 +752,7 @@ set(DUCQ_CORE_SOURCES
     src/core/DbSession.cpp
     src/core/ExtensionLoader.cpp
     src/core/HistoryStore.cpp
+    src/core/QuackTargets.cpp
     src/core/ResultCache.cpp
     src/core/QueryRunner.cpp
     src/core/Catalog.cpp)
@@ -728,6 +771,12 @@ add_executable(DucQ WIN32 MACOSX_BUNDLE
     src/export/Exporter.cpp src/export/Exporter.h)
 target_include_directories(DucQ PRIVATE src)
 target_link_libraries(DucQ PRIVATE Qt6::Widgets duckdb_bundle)
+if(DUCQ_QUACK)
+    # The server-connect dialog only exists in quack builds; every reference
+    # to it in MainWindow.cpp is behind the same ifdef.
+    target_sources(DucQ PRIVATE
+        src/ui/QuackConnectDialog.cpp src/ui/QuackConnectDialog.h)
+endif()
 if(MSVC)
     target_compile_options(DucQ PRIVATE /W4 /bigobj /permissive- /utf-8)
 else()
@@ -762,6 +811,16 @@ if(DUCQ_DYNAMIC_EXTENSIONS)
                 "$<TARGET_FILE_DIR:DucQ>/extensions"
         COMMENT "Collecting *.duckdb_extension loadables"
         DEPENDS DucQ)
+    # Same for the test binary, so extension-dependent tests (the quack
+    # loopback) exercise the real load path there instead of skipping.
+    add_custom_target(ducq_collect_loadables_test ALL
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:test_core>/extensions"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${duckdb_ext_BINARY_DIR}/extension"
+                "$<TARGET_FILE_DIR:test_core>/extensions"
+        COMMENT "Collecting *.duckdb_extension loadables for tests"
+        DEPENDS test_core)
 endif()
 
 if(TARGET mysql_scanner_pack)

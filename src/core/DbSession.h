@@ -26,6 +26,14 @@ public:
     // Opens the database and starts the worker thread; an empty path opens a
     // transient in-memory database.
     bool open(const QString &path, QString *errorMessage);
+    // Same, plus SQL run on the worker connection right after it opens (used
+    // for remote sessions: ATTACH + CONNECT before any user query) and a
+    // label the UI shows for the connection (e.g. "host:port"). When the
+    // bootstrap fails the session is left closed and errorMessage carries the
+    // server's reply. remoteTarget() mirrors the connection the session was
+    // created for, so the UI can dedupe reconnects.
+    bool open(const QString &path, const QString &bootstrapSql, const QString &displayName,
+              const QString &remoteTarget, QString *errorMessage);
     // Stops the worker and closes the database. Safe to call repeatedly.
     void close();
 
@@ -33,6 +41,8 @@ public:
     bool isInMemory() const { return m_database.isInMemory(); }
     const QString &path() const { return m_database.path(); }
     bool isBusy() const { return m_pending > 0; }
+    const QString &displayName() const { return m_displayName; }
+    const QString &remoteTarget() const { return m_remoteTarget; }
 
 public slots:
     void runSql(quint64 queryId, const QString &sql);
@@ -45,6 +55,8 @@ private:
     QThread *m_thread = nullptr;
     QueryRunner *m_runner = nullptr;
     int m_pending = 0;
+    QString m_displayName;
+    QString m_remoteTarget;
 };
 
 } // namespace ducq

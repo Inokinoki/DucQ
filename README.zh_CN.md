@@ -28,6 +28,7 @@
 ## 功能
 
 - 打开 / 新建 `.duckdb` 数据库文件，内置内存数据库开箱即用
+- 作为**远程 DuckDB 服务器的客户端**（文件 → 连接到 DuckDB 服务器…）：经 DuckDB 的 **Quack** 协议 ATTACH 远端（`ATTACH 'quack:host:9494' AS remote`）——远端表并入 schema 树，`FROM remote.main.t` 之类的查询在服务端执行并带过滤/投影下推；支持可选 token，记住最近连接的服务器（token 绝不落盘）；默认内置，`-DDUCQ_QUACK=OFF` 可编译去除
 - 通过 SQL 查询多种远端后端：`ATTACH` 支持 **Postgres、MySQL/MariaDB 和 SQLite 文件**；httpfs 直接读云存储与 URL（`read_parquet('s3://bucket/data.parquet')`、`read_csv('https://…')`）；`read_xlsx()` 查 Excel；湖仓格式经 **DuckLake** 与 **Delta Lake**（`ATTACH 'lake.db' AS lake (TYPE DUCKLAKE)` / `read_delta('s3://…')`）；attached 的表会出现在 schema 树中
 - 内置全文搜索（`PRAGMA create_fts_index` + `match_bm25`）与向量相似度检索（HNSW 索引）
 - 支持多个并发连接，每个连接独立工作线程 —— 通过执行按钮旁的选择器或 `Ctrl+Tab` 切换（SQL 层 `ATTACH` 同样可用）
@@ -47,6 +48,8 @@
 
 - **默认（静态）**：单二进制，内置扩展全部静态注册，引擎的动态扩展加载机制在编译期被剔除。
 - **`-DDUCQ_DYNAMIC_EXTENSIONS=ON`**：引擎改为源码构建并启用 `INSTALL`/`LOAD`。源码树扩展以动态库形态放在可执行文件旁的 `extensions/` 目录，启动时自动加载；`~/.duckdb/extensions/` 下已安装的任何 DuckDB 扩展（含社区构建——会设置 `allow_unsigned_extensions`）同样会被拾取。仍是单二进制；启动时加载失败的扩展会被静默跳过。
+
+Quack（DuckDB 客户端-服务器协议的客户端）在两种模式下默认开启；`-DDUCQ_QUACK=OFF` 可得到不含它、也没有服务器连接入口的二进制。端到端试用：在任意 DuckDB（CLI 或 DucQ 的 SQL 编辑器）里执行 `CALL quack_serve('quack:localhost');`（token 用 `token => '…'` 传入，返回结果里有），然后在 DucQ 的 文件 → 连接到 DuckDB 服务器… 连接即可。
 
 依赖：CMake ≥ 3.24、Ninja、Qt ≥ 6.4（Widgets + Test）、C++20 编译器。DuckDB v2.0.0 静态库由 CMake FetchContent 自动下载（含 SHA256 校验），无需手动安装。
 
@@ -77,7 +80,7 @@ cmake --build build
 - **线程模型**：每个数据库一个 worker `QThread`；查询在该线程通过 `duckdb_pending_prepared` + `duckdb_pending_execute_task` 驱动，UI 与查询层只经 queued signal/slot 通信；`duckdb_interrupt` 实现跨线程取消。
 - **结果访问**：执行完成后获得物化结果（2.0 中 `duckdb_pending_prepared` 默认物化），`duckdb_result` 所有权移交 UI 线程，`duckdb_value_*` 访问器惰性转换单元格——对任意向量布局（字典 / 压缩）安全，避免触碰原始 flat 指针。
 - **静态扩展**：DuckDB 2.0 的静态扩展（parquet/json/icu 等）需在 `duckdb_open` 前调用 `duckdb_register_static_extension(<ext>_describe)` 注册，见 `src/core/StaticExtensions.cpp`。
-- **远端数据库与额外后端**：`postgres_scanner`、`mysql_scanner`、`sqlite_scanner`、`httpfs`、`excel`、`fts`、`vss`、`ducklake`、`delta` 扩展从源码构建（预编译静态库包不含它们），以同样方式静态注册。CMake 逐一探测依赖，缺失时自动跳过对应扩展，保证各平台构建始终通过：`postgres_scanner` 需要 **libpq ≥ 18**（OAuth API），`excel` 需要 **minizip-ng**，`mysql_scanner` 需要 **libmariadb**（其 pinned CMake 只构建 loadable，DucQ 将其对象打包为静态归档并手写 describe 入口），`delta` 经 cargo 构建 Rust kernel（rustc 不可用时自动跳过）。`iceberg` 已构建但未注册——其静态初始化会使进程启动时挂起。`spatial` 在 GDAL ≥ 3.13 下被跳过（pinned 代码基于旧版 GDAL VSI API）。
+- **远端数据库与额外后端**：`postgres_scanner`、`mysql_scanner`、`sqlite_scanner`、`httpfs`、`excel`、`fts`、`vss`、`ducklake`、`delta`、`quack` 扩展从源码构建（预编译静态库包不含它们），以同样方式静态注册。CMake 逐一探测依赖，缺失时自动跳过对应扩展，保证各平台构建始终通过：`postgres_scanner` 需要 **libpq ≥ 18**（OAuth API），`excel` 需要 **minizip-ng**，`mysql_scanner` 需要 **libmariadb**（其 pinned CMake 只构建 loadable，DucQ 将其对象打包为静态归档并手写 describe 入口），`delta` 经 cargo 构建 Rust kernel（rustc 不可用时自动跳过）。`iceberg` 已构建但未注册——其静态初始化会使进程启动时挂起。`spatial` 在 GDAL ≥ 3.13 下被跳过（pinned 代码基于旧版 GDAL VSI API）。
 - **大结果集**：物化结果常驻内存，超大数据集请在 SQL 中加 `LIMIT`（导出走 `COPY`，服务端流式，不受影响）。
 
 ## Roadmap

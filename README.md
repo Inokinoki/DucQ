@@ -28,6 +28,7 @@ A cross-platform [DuckDB](https://duckdb.org) desktop client — pure C++ / Qt W
 ## Features
 
 - Open / create `.duckdb` database files; an in-memory database works out of the box
+- Act as a **client of a remote DuckDB server** (File → Connect to DuckDB Server…): attaches over DuckDB's **Quack** protocol (`ATTACH 'quack:host:9494' AS remote`) — the remote's tables join the schema tree and queries like `FROM remote.main.t` run server-side with filter/projection pushdown; optional token, recent servers remembered (tokens never touch disk); built in by default, `-DDUCQ_QUACK=OFF` compiles it out
 - Query remote backends over SQL: `ATTACH` for **Postgres, MySQL/MariaDB and SQLite files**, cloud storage & URLs via httpfs (`read_parquet('s3://bucket/data.parquet')`, `read_csv('https://…')`), Excel via `read_xlsx()`, lakehouse formats via **DuckLake** and **Delta Lake** (`ATTACH 'lake.db' AS lake (TYPE DUCKLAKE)` / `read_delta('s3://…')`); attached tables appear in the schema tree
 - Full-text search (`PRAGMA create_fts_index` + `match_bm25`) and vector similarity (HNSW indexes) built in
 - Multiple simultaneous connections, each with its own worker thread — switch via the selector next to Run or `Ctrl+Tab` (SQL-level `ATTACH` works too)
@@ -49,6 +50,8 @@ Two build modes:
 
 - **Default (static)**: single binary, all bundled extensions statically registered, dynamic extension loading compiled out of the engine.
 - **`-DDUCQ_DYNAMIC_EXTENSIONS=ON`**: the engine is built from source with `INSTALL`/`LOAD` enabled. Out-of-tree extensions are placed in an `extensions/` directory next to the executable and auto-loaded at startup, and any DuckDB extension installed into `~/.duckdb/extensions/` (including community builds — `allow_unsigned_extensions` is set) is picked up too. Still a single binary; extension failures at startup are skipped silently.
+
+Quack (the client of DuckDB's client-server protocol) is on by default in both modes; `-DDUCQ_QUACK=OFF` builds a binary without it and without the server-connect UI. To try it end to end, serve from any DuckDB (CLI or DucQ's SQL editor): `CALL quack_serve('quack:localhost');` (token via `token => '…'`, see `CALL quack_serve()`'s output), then connect from File → Connect to DuckDB Server….
 
 ```bash
 # macOS (Homebrew Qt)
@@ -77,7 +80,7 @@ Three-platform CI: see [.github/workflows/build.yml](.github/workflows/build.yml
 - **Threading model**: one worker `QThread` per database; queries are driven there through `duckdb_pending_prepared` + `duckdb_pending_execute_task`, and the UI talks to the query layer only via queued signal/slot. `duckdb_interrupt` provides cross-thread cancellation.
 - **Result access**: execution finishes into a materialized result (in 2.0, `duckdb_pending_prepared` materializes by default). The `duckdb_result` is handed to the UI thread, which converts cells lazily with the `duckdb_value_*` accessors — safe for any internal vector layout, without ever touching raw flat pointers.
 - **Static extensions**: DuckDB 2.0's statically linked extensions (parquet/json/icu/…) must be registered with `duckdb_register_static_extension(<ext>_describe)` before the first `duckdb_open()`; see `src/core/StaticExtensions.cpp`.
-- **Remote databases & extra backends**: the `postgres_scanner`, `mysql_scanner`, `sqlite_scanner`, `httpfs`, `excel`, `fts`, `vss`, `ducklake` and `delta` extensions are built from source (the prebuilt static-libs bundle doesn't ship them) and statically registered the same way. Dependency probing keeps builds green everywhere: `postgres_scanner` requires **libpq ≥ 18** (OAuth APIs), `excel` requires **minizip-ng**, `mysql_scanner` requires **libmariadb** (its pinned CMake only builds a loadable, so DucQ packs its objects into a static archive with a hand-written describe entry), and `delta` builds its Rust kernel via cargo (skipped gracefully when rustc is missing or broken). `iceberg` is built but not registered — its static init hangs the process at startup. `spatial` is skipped with GDAL ≥ 3.13 (its pinned code targets the older GDAL VSI API).
+- **Remote databases & extra backends**: the `postgres_scanner`, `mysql_scanner`, `sqlite_scanner`, `httpfs`, `excel`, `fts`, `vss`, `ducklake`, `delta` and `quack` extensions are built from source (the prebuilt static-libs bundle doesn't ship them) and statically registered the same way. Dependency probing keeps builds green everywhere: `postgres_scanner` requires **libpq ≥ 18** (OAuth APIs), `excel` requires **minizip-ng**, `mysql_scanner` requires **libmariadb** (its pinned CMake only builds a loadable, so DucQ packs its objects into a static archive with a hand-written describe entry), and `delta` builds its Rust kernel via cargo (skipped gracefully when rustc is missing or broken). `iceberg` is built but not registered — its static init hangs the process at startup. `spatial` is skipped with GDAL ≥ 3.13 (its pinned code targets the older GDAL VSI API).
 - **Large result sets**: materialized results stay in memory; add a `LIMIT` in SQL for very large data (exports go through `COPY`, which streams server-side and is unaffected).
 
 ## Roadmap

@@ -20,6 +20,12 @@ DbSession::~DbSession()
 
 bool DbSession::open(const QString &path, QString *errorMessage)
 {
+    return open(path, QString(), QString(), QString(), errorMessage);
+}
+
+bool DbSession::open(const QString &path, const QString &bootstrapSql, const QString &displayName,
+                     const QString &remoteTarget, QString *errorMessage)
+{
     close();
     if (!m_database.open(path, false, errorMessage))
         return false;
@@ -31,6 +37,18 @@ bool DbSession::open(const QString &path, QString *errorMessage)
             [this](quint64, qint64, qsizetype, bool, const QString &) { --m_pending; });
     m_thread->start();
     QMetaObject::invokeMethod(m_runner, "initialize", Qt::BlockingQueuedConnection);
+    if (!bootstrapSql.isEmpty()) {
+        QMetaObject::invokeMethod(m_runner, "bootstrap", Qt::BlockingQueuedConnection,
+                                  Q_ARG(QString, bootstrapSql));
+        if (!m_runner->bootstrapOk()) {
+            if (errorMessage)
+                *errorMessage = m_runner->bootstrapError();
+            close();
+            return false;
+        }
+    }
+    m_displayName = displayName;
+    m_remoteTarget = remoteTarget;
     return true;
 }
 
@@ -53,6 +71,8 @@ void DbSession::close()
     m_thread = nullptr;
     m_database.close();
     m_pending = 0;
+    m_displayName.clear();
+    m_remoteTarget.clear();
 }
 
 void DbSession::runSql(quint64 queryId, const QString &sql)
