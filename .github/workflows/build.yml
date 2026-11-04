@@ -13,37 +13,64 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Default static build (with Quack) — also produces the screenshots.
           - name: linux
             os: ubuntu-latest
+            cmake_args: ""
+            screenshot: true
           - name: macos
             os: macos-latest
+            cmake_args: ""
+            screenshot: true
           - name: windows
             os: windows-latest
+            cmake_args: ""
+            screenshot: true
+          # Quack compiled out — keeps the DUCQ_QUACK=OFF combination honest.
+          - name: linux-noquack
+            os: ubuntu-latest
+            cmake_args: -DDUCQ_QUACK=OFF
+            screenshot: false
+          - name: macos-noquack
+            os: macos-latest
+            cmake_args: -DDUCQ_QUACK=OFF
+            screenshot: false
+          - name: windows-noquack
+            os: windows-latest
+            cmake_args: -DDUCQ_QUACK=OFF
+            screenshot: false
+          # Engine built from source with INSTALL/LOAD enabled. Heaviest leg
+          # (the whole engine compiles), so it runs on one platform only; the
+          # quack loopback exercises the LOAD path there.
+          - name: linux-dynamic
+            os: ubuntu-latest
+            cmake_args: -DDUCQ_DYNAMIC_EXTENSIONS=ON
+            screenshot: false
     steps:
       - uses: actions/checkout@v4
 
       - name: Install toolchain (Linux)
-        if: matrix.name == 'linux'
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev ninja-build
 
       - name: Install Qt (macOS/Windows)
-        if: matrix.name != 'linux'
+        if: runner.os != 'Linux'
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.10'
-          arch: ${{ matrix.name == 'windows' && 'win64_msvc2022_64' || 'clang_64' }}
+          arch: ${{ runner.os == 'Windows' && 'win64_msvc2022_64' || 'clang_64' }}
           cache: true
 
       # Make sure the MSVC environment wins over the MinGW in the runner PATH,
       # so Ninja picks cl.exe (the DuckDB/Qt artifacts are MSVC builds).
       - name: Set up MSVC (Windows)
-        if: matrix.name == 'windows'
+        if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Configure
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo ${{ matrix.cmake_args }}
 
       - name: Build
         run: cmake --build build --parallel
@@ -56,10 +83,11 @@ jobs:
       # offscreen platform; Windows/macOS runners have a desktop session and
       # use the native platform (offscreen lacks system fonts there).
       - name: Screenshot smoke
+        if: matrix.screenshot
         working-directory: build
         shell: bash
         env:
-          QT_QPA_PLATFORM: ${{ matrix.name == 'linux' && 'offscreen' || '' }}
+          QT_QPA_PLATFORM: ${{ runner.os == 'Linux' && 'offscreen' || '' }}
         run: |
           case "$RUNNER_OS" in
             Windows) BIN="./DucQ.exe" ;;
