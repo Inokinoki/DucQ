@@ -15,272 +15,332 @@
     </message>
 </context>
 <context>
+    <name>ducq::DbSession</name>
+    <message>
+        <location filename="../src/core/DbSession.cpp" line="59" />
+        <source>Session is not open</source>
+        <translation>La session n'est pas ouverte</translation>
+    </message>
+</context>
+<context>
     <name>ducq::MainWindow</name>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="135" />
-        <location filename="../src/ui/MainWindow.cpp" line="412" />
+        <location filename="../src/ui/MainWindow.cpp" line="154" />
+        <location filename="../src/ui/MainWindow.cpp" line="547" />
         <source>Query history</source>
         <translation>Historique des requêtes</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="117" />
-        <location filename="../src/ui/MainWindow.cpp" line="413" />
+        <location filename="../src/ui/MainWindow.cpp" line="125" />
+        <location filename="../src/ui/MainWindow.cpp" line="548" />
         <source>Filter tables…</source>
         <translation>Filtrer les tables…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="416" />
+        <location filename="../src/ui/MainWindow.cpp" line="551" />
         <source>&amp;File</source>
         <translation>&amp;Fichier</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="417" />
+        <location filename="../src/ui/MainWindow.cpp" line="552" />
         <source>New Database…</source>
         <translation>Nouvelle base de données…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="418" />
+        <location filename="../src/ui/MainWindow.cpp" line="553" />
         <source>Open Database…</source>
         <translation>Ouvrir une base de données…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="424" />
+        <location filename="../src/ui/MainWindow.cpp" line="560" />
         <source>Export Current Results as CSV…</source>
         <translation>Exporter les résultats actuels en CSV…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="425" />
+        <location filename="../src/ui/MainWindow.cpp" line="561" />
         <source>Export Current Results as Parquet…</source>
         <translation>Exporter les résultats actuels en Parquet…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="427" />
+        <location filename="../src/ui/MainWindow.cpp" line="563" />
         <source>Exit</source>
         <translation>Quitter</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="430" />
+        <location filename="../src/ui/MainWindow.cpp" line="575" />
         <source>&amp;Language</source>
         <translation>&amp;Langue</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="431" />
+        <location filename="../src/ui/MainWindow.cpp" line="576" />
         <source>Refresh Schema</source>
         <translation>Actualiser le schéma</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="439" />
+        <location filename="../src/ui/MainWindow.cpp" line="584" />
         <source>Cancel</source>
         <translation>Annuler</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="517" />
+        <location filename="../src/ui/MainWindow.cpp" line="662" />
         <source>A query is running. Wait for it to finish or cancel it first.</source>
         <translation>Une requête est en cours. Attendez qu'elle se termine ou annulez-la d'abord.</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="523" />
-        <location filename="../src/ui/MainWindow.cpp" line="537" />
+        <location filename="../src/ui/MainWindow.cpp" line="668" />
+        <location filename="../src/ui/MainWindow.cpp" line="682" />
         <source>New DuckDB Database</source>
         <translation>Nouvelle base de données DuckDB</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="526" />
+        <location filename="../src/ui/MainWindow.cpp" line="671" />
         <source>DuckDB databases (*.duckdb *.db);;All files (*)</source>
         <translation>Bases de données DuckDB (*.duckdb *.db);;Tous les fichiers (*)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="547" />
+        <location filename="../src/ui/MainWindow.cpp" line="692" />
         <source>Open DuckDB Database</source>
         <translation>Ouvrir une base de données DuckDB</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="548" />
+        <location filename="../src/ui/MainWindow.cpp" line="693" />
         <source>DuckDB databases (*.duckdb *.db *.ddb);;All files (*)</source>
         <translation>Bases de données DuckDB (*.duckdb *.db *.ddb);;Tous les fichiers (*)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="454" />
+        <location filename="../src/ui/MainWindow.cpp" line="599" />
         <source>Open Failed</source>
         <translation>Échec de l'ouverture</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="411" />
+        <location filename="../src/ui/MainWindow.cpp" line="546" />
         <source>Active connection (Ctrl+Tab cycles)</source>
         <translation>Connexion active (Ctrl+Tab pour naviguer)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="657" />
+        <location filename="../src/ui/MainWindow.cpp" line="864" />
         <source>Not connected</source>
         <translation>Non connecté</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="499" />
+        <location filename="../src/ui/MainWindow.cpp" line="644" />
         <source>In-memory database</source>
         <translation>Base de données en mémoire</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="409" />
+        <location filename="../src/ui/MainWindow.cpp" line="544" />
         <source>Run</source>
         <translation>Exécuter</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="410" />
+        <location filename="../src/ui/MainWindow.cpp" line="545" />
         <source>Run the SQL (Ctrl+⏎)</source>
         <translation>Exécuter le SQL (Ctrl+⏎)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="132" />
+        <location filename="../src/ui/MainWindow.cpp" line="151" />
         <source>Active connection</source>
         <translation>Connexion active</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="243" />
+        <location filename="../src/ui/MainWindow.cpp" line="266" />
         <source>Cursor position</source>
         <translation>Position du curseur</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="347" />
+        <location filename="../src/ui/MainWindow.cpp" line="381" />
         <source>Ln %L1, Col %L2</source>
         <translation>Lig %L1, Col %L2</translation>
     </message>
     <message>
+        <location filename="../src/ui/MainWindow.cpp" line="402" />
+        <location filename="../src/ui/MainWindow.cpp" line="571" />
+        <source>Query %1</source>
+        <translation>Requête %1</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="418" />
+        <source>Close Query Tab</source>
+        <translation>Fermer l'onglet de requête</translation>
+    </message>
+    <message>
         <location filename="../src/ui/MainWindow.cpp" line="419" />
+        <source>This tab has changes that were not executed and will be lost. Close anyway?</source>
+        <translation>Cet onglet contient des modifications non exécutées qui seront perdues. Fermer quand même ?</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="433" />
+        <source>Rename Tab</source>
+        <translation>Renommer l'onglet</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="434" />
+        <source>Tab name:</source>
+        <translation>Nom de l'onglet :</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="554" />
         <source>New In-Memory Connection</source>
         <translation>Nouvelle connexion en mémoire</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="421" />
+        <location filename="../src/ui/MainWindow.cpp" line="556" />
         <source>Connect to DuckDB Server…</source>
         <translation>Se connecter au serveur DuckDB…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="423" />
+        <location filename="../src/ui/MainWindow.cpp" line="557" />
+        <source>Serve Database over Quack…</source>
+        <translation>Partager la base de données via Quack…</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="559" />
         <source>Close Connection</source>
         <translation>Fermer la connexion</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="426" />
+        <location filename="../src/ui/MainWindow.cpp" line="562" />
         <source>Close Result Tab</source>
         <translation>Fermer l'onglet de résultats</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="428" />
+        <location filename="../src/ui/MainWindow.cpp" line="565" />
+        <source>New query tab (Ctrl+T)</source>
+        <translation>Nouvel onglet de requête (Ctrl+T)</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="573" />
         <source>&amp;Query</source>
         <translation>&amp;Requête</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="429" />
+        <location filename="../src/ui/MainWindow.cpp" line="574" />
         <source>&amp;Run SQL</source>
         <translation>Exécuter le &amp;SQL</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="433" />
+        <location filename="../src/ui/MainWindow.cpp" line="578" />
         <source>&amp;View</source>
         <translation>&amp;Affichage</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="434" />
+        <location filename="../src/ui/MainWindow.cpp" line="579" />
         <source>&amp;Theme</source>
         <translation>&amp;Thème</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="435" />
+        <location filename="../src/ui/MainWindow.cpp" line="580" />
         <source>Follow System</source>
         <translation>Suivre le système</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="436" />
+        <location filename="../src/ui/MainWindow.cpp" line="581" />
         <source>Light</source>
         <translation>Clair</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="437" />
+        <location filename="../src/ui/MainWindow.cpp" line="582" />
         <source>Dark</source>
         <translation>Sombre</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="538" />
+        <location filename="../src/ui/MainWindow.cpp" line="683" />
         <source>%1 already exists. Open it as an existing database?</source>
         <translation>%1 existe déjà. L'ouvrir comme base de données existante ?</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="561" />
+        <location filename="../src/ui/MainWindow.cpp" line="706" />
         <source>Already open in another connection: %1</source>
         <translation>Déjà ouvert dans une autre connexion : %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="603" />
+        <location filename="../src/ui/MainWindow.cpp" line="748" />
         <source>Already connected: %1</source>
         <translation>Déjà connecté : %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="620" />
+        <location filename="../src/ui/MainWindow.cpp" line="767" />
         <source>Connected to %1</source>
         <translation>Connecté à %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="670" />
+        <location filename="../src/ui/MainWindow.cpp" line="789" />
+        <location filename="../src/ui/MainWindow.cpp" line="803" />
+        <source>The connection was closed.</source>
+        <translation>La connexion a été fermée.</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="797" />
+        <source>Serving %1 over Quack</source>
+        <translation>%1 est partagé via Quack</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="808" />
+        <source>Stopped serving %1</source>
+        <translation>Partage de %1 arrêté</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="877" />
         <source>Export</source>
         <translation>Exporter</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="670" />
+        <location filename="../src/ui/MainWindow.cpp" line="877" />
         <source>Select a finished result tab first.</source>
         <translation>Sélectionnez d'abord un onglet de résultats terminé.</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="677" />
+        <location filename="../src/ui/MainWindow.cpp" line="884" />
         <source>Parquet (*.parquet)</source>
         <translation>Parquet (*.parquet)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="677" />
+        <location filename="../src/ui/MainWindow.cpp" line="884" />
         <source>CSV (*.csv)</source>
         <translation>CSV (*.csv)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="678" />
+        <location filename="../src/ui/MainWindow.cpp" line="885" />
         <source>Export Results</source>
         <translation>Exporter les résultats</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="693" />
+        <location filename="../src/ui/MainWindow.cpp" line="903" />
         <source>No SQL to execute</source>
         <translation>Aucun SQL à exécuter</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="714" />
+        <location filename="../src/ui/MainWindow.cpp" line="927" />
         <source>Running — %1</source>
         <translation>En cours — %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="772" />
+        <location filename="../src/ui/MainWindow.cpp" line="985" />
         <source>Query cancelled</source>
         <translation>Requête annulée</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="784" />
+        <location filename="../src/ui/MainWindow.cpp" line="997" />
         <source>Done: %L1 rows · %L2 ms</source>
         <translation>Terminé : %L1 lignes · %L2 ms</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="808" />
+        <location filename="../src/ui/MainWindow.cpp" line="1021" />
         <source>Schema refreshed: %1 tables/views</source>
         <translation>Schéma actualisé : %1 tables/vues</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="835" />
+        <location filename="../src/ui/MainWindow.cpp" line="1048" />
         <source>Cancel the running query on %1</source>
         <translation>Annuler la requête en cours sur %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="888" />
+        <location filename="../src/ui/MainWindow.cpp" line="1103" />
         <source>Cannot read script: %1</source>
         <translation>Impossible de lire le script : %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="931" />
+        <location filename="../src/ui/MainWindow.cpp" line="1149" />
         <source>Skipped unsupported file: %1</source>
         <translation>Fichier non pris en charge ignoré : %1</translation>
     </message>
@@ -288,7 +348,7 @@
 <context>
     <name>ducq::QuackConnectDialog</name>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="43" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="47" />
         <source>Connect</source>
         <translation>Se connecter</translation>
     </message>
@@ -298,44 +358,112 @@
         <translation>Saisissez une adresse de serveur, p. ex. localhost:9494.</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="56" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="57" />
         <source>The alias must be a plain identifier (letters, digits, underscore).</source>
         <translation>L'alias doit être un identifiant simple (lettres, chiffres, tiret bas).</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="96" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="100" />
         <source>Connect to DuckDB Server</source>
         <translation>Connexion au serveur DuckDB</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="97" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="105" />
         <source>&amp;Server address:</source>
         <translation>&amp;Adresse du serveur :</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="98" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="106" />
         <source>&amp;Token (optional):</source>
         <translation>&amp;Jeton (facultatif) :</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="99" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="107" />
         <source>&amp;Alias:</source>
         <translation>&amp;Alias :</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="101" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="109" />
         <source>Leave empty if the server has no token</source>
         <translation>Laisser vide si le serveur n'a pas de jeton</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="102" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="110" />
         <source>Name the remote database gets after ATTACH</source>
         <translation>Nom que la base de données distante reçoit après ATTACH</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="103" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="111" />
         <source>Cancel</source>
         <translation>Annuler</translation>
+    </message>
+</context>
+<context>
+    <name>ducq::QuackServeDialog</name>
+    <message>
+        <location filename="../src/ui/QuackServeDialog.cpp" line="82" />
+        <source>token: %1</source>
+        <translation>jeton : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/QuackServeDialog.cpp" line="88" />
+        <source>Copy token</source>
+        <translation>Copier le jeton</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/QuackServeDialog.cpp" line="96" />
+        <source>Stop server</source>
+        <translation>Arrêter le serveur</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/QuackServeDialog.cpp" line="130" />
+        <source>Serve Database over Quack</source>
+        <translation>Partage de base de données via Quack</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/QuackServeDialog.cpp" line="131" />
+        <source>Sharing the database of the active connection</source>
+        <translation>Partage de la base de données de la connexion active</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/QuackServeDialog.cpp" line="136" />
+        <source>&amp;Port:</source>
+        <translation>&amp;Port :</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/QuackServeDialog.cpp" line="137" />
+        <source>&amp;Token:</source>
+        <translation>&amp;Jeton :</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/QuackServeDialog.cpp" line="138" />
+        <source>Clients on this machine attach via quack:localhost:&lt;port&gt;</source>
+        <translation>Les clients de cette machine se connectent via quack:localhost:&lt;port&gt;</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/QuackServeDialog.cpp" line="139" />
+        <source>Clients must present this token to attach</source>
+        <translation>Les clients doivent présenter ce jeton pour se connecter</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/QuackServeDialog.cpp" line="140" />
+        <source>Start Server</source>
+        <translation>Démarrer le serveur</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/QuackServeDialog.cpp" line="141" />
+        <source>Running servers</source>
+        <translation>Serveurs en cours</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/QuackServeDialog.cpp" line="142" />
+        <source>No servers are running.</source>
+        <translation>Aucun serveur en cours d'exécution.</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/QuackServeDialog.cpp" line="145" />
+        <source>Close</source>
+        <translation>Fermer</translation>
     </message>
 </context>
 <context>
@@ -439,17 +567,17 @@
 <context>
     <name>ducq::SchemaTree</name>
     <message>
-        <location filename="../src/ui/SchemaTree.cpp" line="39" />
+        <location filename="../src/ui/SchemaTree.cpp" line="47" />
         <source>Object</source>
         <translation>Objet</translation>
     </message>
     <message>
-        <location filename="../src/ui/SchemaTree.cpp" line="39" />
+        <location filename="../src/ui/SchemaTree.cpp" line="47" />
         <source>Type</source>
         <translation>Type</translation>
     </message>
     <message>
-        <location filename="../src/ui/SchemaTree.cpp" line="153" />
+        <location filename="../src/ui/SchemaTree.cpp" line="172" />
         <source>Refresh Schema</source>
         <translation>Actualiser le schéma</translation>
     </message>
