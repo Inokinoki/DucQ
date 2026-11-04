@@ -29,6 +29,7 @@ A cross-platform [DuckDB](https://duckdb.org) desktop client — pure C++ / Qt W
 
 - Open / create `.duckdb` database files; an in-memory database works out of the box
 - Act as a **client of a remote DuckDB server** (File → Connect to DuckDB Server…): attaches over DuckDB's **Quack** protocol (`ATTACH 'quack:host:9494' AS remote`) — the remote's tables join the schema tree and queries like `FROM remote.main.t` run server-side with filter/projection pushdown; optional token, recent servers remembered (tokens never touch disk); built in by default, `-DDUCQ_QUACK=OFF` compiles it out
+- **Share your database over Quack** (File → Serve Database over Quack…): starts a server for the active connection on a chosen port with a generated token — another DucQ (or any DuckDB) elsewhere can attach to it and query
 - Query remote backends over SQL: `ATTACH` for **Postgres, MySQL/MariaDB and SQLite files**, cloud storage & URLs via httpfs (`read_parquet('s3://bucket/data.parquet')`, `read_csv('https://…')`), Excel via `read_xlsx()`, lakehouse formats via **DuckLake** and **Delta Lake** (`ATTACH 'lake.db' AS lake (TYPE DUCKLAKE)` / `read_delta('s3://…')`); attached tables appear in the schema tree
 - Full-text search (`PRAGMA create_fts_index` + `match_bm25`) and vector similarity (HNSW indexes) built in
 - Multiple simultaneous connections, each with its own worker thread — switch via the selector next to Run or `Ctrl+Tab` (SQL-level `ATTACH` works too)

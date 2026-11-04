@@ -36,6 +36,11 @@ public:
               const QString &remoteTarget, QString *errorMessage);
     // Stops the worker and closes the database. Safe to call repeatedly.
     void close();
+    // Runs a statement synchronously on the worker connection and reports
+    // success/error (used for admin statements like quack_serve/quack_stop).
+    // Blocks until the statement finishes; callers should ensure the session
+    // is idle first.
+    bool runSync(const QString &sql, QString *errorMessage);
 
     bool isOpen() const { return m_database.isOpen(); }
     bool isInMemory() const { return m_database.isInMemory(); }

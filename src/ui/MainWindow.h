@@ -6,6 +6,9 @@
 
 #include "core/Catalog.h"
 #include "core/ResultCache.h"
+#ifdef DUCQ_QUACK
+#include "QuackServeDialog.h"
+#endif
 
 class QComboBox;
 class QDragEnterEvent;
@@ -54,6 +57,7 @@ private slots:
     void newInMemoryConnection();
 #ifdef DUCQ_QUACK
     void connectQuackServer();
+    void serveQuackDatabase();
 #endif
     void closeConnection();
     void switchSession(int sessionId);
@@ -96,6 +100,7 @@ private:
 #ifdef DUCQ_QUACK
     QStringList quackRecentTargets() const;
     void rememberQuackTarget(const QString &server);
+    QString generateQuackToken() const;
 #endif
     void setStatusMessage(const QString &message);
     void setStatusError(const QString &message);
@@ -133,6 +138,7 @@ private:
     QAction *m_newMemoryAction = nullptr;
 #ifdef DUCQ_QUACK
     QAction *m_quackConnectAction = nullptr;
+    QAction *m_quackServeAction = nullptr;
 #endif
     QAction *m_closeConnectionAction = nullptr;
     QAction *m_exportCsvAction = nullptr;
@@ -158,6 +164,11 @@ private:
     QStringList m_history;
     bool m_persistState = true; // off for headless screenshots
     bool m_statusIsError = false; // re-colored on theme switches
+#ifdef DUCQ_QUACK
+    // Servers started from this window, per session; the underlying
+    // quack_serve instance dies with its session's database.
+    QList<ducq::QuackServerEntry> m_quackServers;
+#endif
 };
 
 } // namespace ducq

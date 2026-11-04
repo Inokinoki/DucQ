@@ -772,10 +772,11 @@ add_executable(DucQ WIN32 MACOSX_BUNDLE
 target_include_directories(DucQ PRIVATE src)
 target_link_libraries(DucQ PRIVATE Qt6::Widgets duckdb_bundle)
 if(DUCQ_QUACK)
-    # The server-connect dialog only exists in quack builds; every reference
-    # to it in MainWindow.cpp is behind the same ifdef.
+    # The server-connect/serve dialogs only exist in quack builds; every
+    # reference to them in MainWindow.cpp is behind the same ifdef.
     target_sources(DucQ PRIVATE
-        src/ui/QuackConnectDialog.cpp src/ui/QuackConnectDialog.h)
+        src/ui/QuackConnectDialog.cpp src/ui/QuackConnectDialog.h
+        src/ui/QuackServeDialog.cpp src/ui/QuackServeDialog.h)
 endif()
 if(MSVC)
     target_compile_options(DucQ PRIVATE /W4 /bigobj /permissive- /utf-8)

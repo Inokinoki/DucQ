@@ -15,6 +15,7 @@
 #include "export/Exporter.h"
 #ifdef DUCQ_QUACK
 #include "QuackConnectDialog.h"
+#include "QuackServeDialog.h"
 #endif
 
 #include <QActionGroup>
@@ -36,6 +37,7 @@
 #include <QProgressBar>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QRandomGenerator>
 #include <QSettings>
 #include <QShortcut>
 #include <QSplitter>
@@ -201,6 +203,8 @@ void MainWindow::buildUi()
 #ifdef DUCQ_QUACK
     m_quackConnectAction = m_fileMenu->addAction(QString());
     connect(m_quackConnectAction, &QAction::triggered, this, &MainWindow::connectQuackServer);
+    m_quackServeAction = m_fileMenu->addAction(QString());
+    connect(m_quackServeAction, &QAction::triggered, this, &MainWindow::serveQuackDatabase);
 #endif
     m_closeConnectionAction = m_fileMenu->addAction(QString());
     connect(m_closeConnectionAction, &QAction::triggered, this, &MainWindow::closeConnection);
@@ -419,6 +423,7 @@ void MainWindow::retranslateUi()
     m_newMemoryAction->setText(tr("New In-Memory Connection"));
 #ifdef DUCQ_QUACK
     m_quackConnectAction->setText(tr("Connect to DuckDB Server…"));
+    m_quackServeAction->setText(tr("Serve Database over Quack…"));
 #endif
     m_closeConnectionAction->setText(tr("Close Connection"));
     m_exportCsvAction->setText(tr("Export Current Results as CSV…"));
@@ -622,6 +627,59 @@ void MainWindow::connectQuackServer()
     setStatusMessage(tr("Connected to %1").arg(server));
 }
 
+QString MainWindow::generateQuackToken() const
+{
+    // 128 random bits, hex encoded — well above the server's 4-character
+    // minimum and comfortable to copy by hand.
+    QString hex;
+    for (int i = 0; i < 4; ++i)
+        hex += QString::number(QRandomGenerator::system()->generate(), 16).rightJustified(8, u'0');
+    return hex;
+}
+
+void MainWindow::serveQuackDatabase()
+{
+    DbSession *session = m_activeSession;
+    if (!session || !ensureSessionIdle(session))
+        return;
+    const int sessionId = session->id();
+    auto start = [this, sessionId](int port, const QString &token) -> QString {
+        DbSession *target = sessionById(sessionId);
+        if (!target)
+            return tr("The connection was closed.");
+        const QString uri = QStringLiteral("quack:localhost:%1").arg(port);
+        QString error;
+        if (!target->runSync(
+                QStringLiteral("CALL quack_serve('%1', token => '%2');")
+                    .arg(uri, escapeSingleQuoted(token)), &error))
+            return error;
+        m_quackServers.append({ sessionId, uri, token });
+        setStatusMessage(tr("Serving %1 over Quack").arg(displayNameFor(target)));
+        return {};
+    };
+    auto stop = [this, sessionId](const QString &uri) -> QString {
+        DbSession *target = sessionById(sessionId);
+        if (!target)
+            return tr("The connection was closed.");
+        QString error;
+        if (!target->runSync(QStringLiteral("CALL quack_stop('%1');").arg(uri), &error))
+            return error;
+        m_quackServers.removeIf([&uri](const QuackServerEntry &entry) { return entry.uri == uri; });
+        setStatusMessage(tr("Stopped serving %1").arg(uri));
+        return {};
+    };
+    auto list = [this, sessionId]() -> QList<QuackServerEntry> {
+        QList<QuackServerEntry> result;
+        for (const QuackServerEntry &entry : m_quackServers)
+            if (entry.sessionId == sessionId)
+                result.append(entry);
+        return result;
+    };
+
+    QuackServeDialog dialog(displayNameFor(session), list(), start, stop, list, this);
+    dialog.exec();
+}
+
 #endif // DUCQ_QUACK
 
 void MainWindow::closeConnection()
@@ -630,6 +688,13 @@ void MainWindow::closeConnection()
     if (!session || !ensureSessionIdle(session))
         return;
     m_resultTabs->closeSessionTabs(session->id());
+#ifdef DUCQ_QUACK
+    // The session's database is going away; its quack_serve instances die
+    // with it, so forget them.
+    m_quackServers.removeIf([session](const QuackServerEntry &entry) {
+        return entry.sessionId == session->id();
+    });
+#endif
     const int index = m_sessionCombo->findData(session->id());
     if (index >= 0)
         m_sessionCombo->removeItem(index);

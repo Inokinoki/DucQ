@@ -36,6 +36,7 @@ private slots:
 #ifdef DUCQ_QUACK
     void testQuackRegistered();
     void testQuackLoopback();
+    void testQuackServeLifecycle();
 #endif
 
 private:
@@ -455,6 +456,59 @@ void TestCore::testQuackLoopback()
     client.close();
     runAndWait(QStringLiteral("CALL quack_stop('quack:localhost:19494');"));
     QVERIFY2(m_error.isEmpty(), qPrintable(m_error));
+}
+
+void TestCore::testQuackServeLifecycle()
+{
+    // The path the "Serve Database over Quack" dialog uses: start a server
+    // on this session's database synchronously (DbSession::runSync),
+    // introspect it via quack_server_list(), stop it, introspect again.
+    DbSession session(42);
+    QString error;
+    QVERIFY2(session.open(QString(), &error), qPrintable(error));
+
+    const QString uri = QStringLiteral("quack:localhost:19496");
+    QVERIFY2(session.runSync(
+                 QStringLiteral("CALL quack_serve('%1', token => 'ducq-serve-test');").arg(uri),
+                 &error),
+             qPrintable(error));
+
+    quint64 done = 0;
+    QString listedUri;
+    qsizetype rows = -1;
+    QString queryError;
+    connect(session.runner(), &QueryRunner::resultReady, &session,
+            [&done, &listedUri, &rows](quint64, quintptr resultPtr, const QVector<ducq::ColumnMeta> &columns) {
+                ResultCache cache;
+                cache.reset(reinterpret_cast<duckdb_result *>(resultPtr), columns, kDefaultDisplayRowLimit);
+                rows = cache.rowCount();
+                listedUri = rows > 0 ? cache.cell(0, 0).toString() : QString();
+                done = 1;
+            });
+    connect(session.runner(), &QueryRunner::finished, &session,
+            [&done, &queryError](quint64, qint64, qsizetype, bool, const QString &error) {
+                queryError = error;
+                done = 1;
+            });
+
+    session.runSql(++m_nextQueryId, QStringLiteral("SELECT listen_uri FROM quack_server_list();"));
+    QTRY_COMPARE_WITH_TIMEOUT(done, quint64(1), 30000);
+    QVERIFY2(queryError.isEmpty(), qPrintable(queryError));
+    QCOMPARE(rows, qsizetype(1));
+    QCOMPARE(listedUri, uri);
+
+    QVERIFY2(session.runSync(QStringLiteral("CALL quack_stop('%1');").arg(uri), &error),
+             qPrintable(error));
+    done = 0;
+    rows = -1;
+    queryError.clear();
+    session.runSql(++m_nextQueryId, QStringLiteral("SELECT count(*) FROM quack_server_list();"));
+    QTRY_COMPARE_WITH_TIMEOUT(done, quint64(1), 30000);
+    QVERIFY2(queryError.isEmpty(), qPrintable(queryError));
+    QCOMPARE(rows, qsizetype(1));
+    QCOMPARE(listedUri.toLongLong(), qint64(0));
+
+    session.close();
 }
 
 #endif // DUCQ_QUACK

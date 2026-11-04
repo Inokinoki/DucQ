@@ -52,6 +52,22 @@ bool DbSession::open(const QString &path, const QString &bootstrapSql, const QSt
     return true;
 }
 
+bool DbSession::runSync(const QString &sql, QString *errorMessage)
+{
+    if (!m_runner) {
+        if (errorMessage)
+            *errorMessage = tr("Session is not open");
+        return false;
+    }
+    QMetaObject::invokeMethod(m_runner, "bootstrap", Qt::BlockingQueuedConnection,
+                              Q_ARG(QString, sql));
+    if (m_runner->bootstrapOk())
+        return true;
+    if (errorMessage)
+        *errorMessage = m_runner->bootstrapError();
+    return false;
+}
+
 void DbSession::close()
 {
     if (m_runner) {

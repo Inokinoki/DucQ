@@ -35,10 +35,11 @@ public slots:
     void shutdown();   // runs in the worker thread: closes the connection
     void execute(quint64 queryId, const QString &sql);
     void refreshCatalog();
-    // Runs setup SQL (e.g. ATTACH + CONNECT for a remote session) on the
-    // worker connection. Meant to be invoked BlockingQueuedConnection from
-    // open(); success and the error text land in the members below, which
-    // are safe to read once the blocking call returns.
+    // Runs SQL synchronously on the worker connection: session bootstrap
+    // (ATTACH + CONNECT for a remote session) via DbSession::open, and admin
+    // statements (quack_serve/quack_stop) via DbSession::runSync. Meant to be
+    // invoked BlockingQueuedConnection; success and the error text land in
+    // the members below, which are safe to read once the call returns.
     void bootstrap(const QString &sql);
     bool bootstrapOk() const { return m_bootstrapOk; }
     QString bootstrapError() const { return m_bootstrapError; }
