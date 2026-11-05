@@ -589,16 +589,8 @@ void MainWindow::retranslateUi()
     updateConnectionLabel();
 }
 
-DbSession *MainWindow::createSession(const QString &path, const QString &bootstrapSql,
-                                     const QString &displayName, const QString &remoteTarget)
+void MainWindow::connectSessionRunner(DbSession *session)
 {
-    auto *session = new DbSession(m_nextSessionId++, this);
-    QString error;
-    if (!session->open(path, bootstrapSql, displayName, remoteTarget, &error)) {
-        QMessageBox::critical(this, tr("Open Failed"), error);
-        delete session;
-        return nullptr;
-    }
     // The runner only exists once the session is open.
     connect(session->runner(), &QueryRunner::resultReady, this,
             [this, session](quint64 qid, quintptr resultPtr, const QVector<ducq::ColumnMeta> &columns) {
@@ -617,7 +609,19 @@ DbSession *MainWindow::createSession(const QString &path, const QString &bootstr
             [this, session](const QVector<ducq::TableInfo> &tables) {
                 onCatalogReady(session->id(), tables);
             });
+}
 
+DbSession *MainWindow::createSession(const QString &path, const QString &bootstrapSql,
+                                     const QString &displayName, const QString &remoteTarget)
+{
+    auto *session = new DbSession(m_nextSessionId++, this);
+    QString error;
+    if (!session->open(path, bootstrapSql, displayName, remoteTarget, &error)) {
+        QMessageBox::critical(this, tr("Open Failed"), error);
+        delete session;
+        return nullptr;
+    }
+    connectSessionRunner(session);
     m_sessions.append(session);
     m_sessionCombo->addItem(displayNameFor(session), session->id());
     return session;
@@ -734,10 +738,17 @@ void MainWindow::connectQuackServer()
 {
     QuackConnectDialog dialog(this);
     dialog.setRecentTargets(quackRecentTargets());
-    if (dialog.exec() != QDialog::Accepted)
-        return;
-    const QString server = dialog.server();
-    const QString token = dialog.token();
+    m_connectDialog = &dialog;
+    connect(&dialog, &QuackConnectDialog::connectRequested, this, &MainWindow::beginQuackConnect);
+    // The dialog stays open while an attempt is in flight and only closes on
+    // its outcome (accept on success, editable again on failure). Closing it
+    // by hand mid-flight abandons the UI, not the attempt: the handler below
+    // still keeps or drops the session depending on how the ATTACH ends.
+    dialog.exec();
+}
+
+void MainWindow::beginQuackConnect(const QString &server, const QString &token, const QString &alias)
+{
     const QString target = QStringLiteral("quack:") + server;
     // Reuse an existing connection to the same server instead of attaching it
     // a second time (ATTACH of the same quack database twice is refused).
@@ -745,6 +756,8 @@ void MainWindow::connectQuackServer()
         if (session->remoteTarget() == target) {
             activateSession(session);
             setStatusMessage(tr("Already connected: %1").arg(session->displayName()));
+            if (m_connectDialog)
+                m_connectDialog->accept();
             return;
         }
     }
@@ -753,17 +766,52 @@ void MainWindow::connectQuackServer()
     // (e.g. FROM remote.main.t) with filtering pushed down to the server.
     // (DuckDB 2.0's CONNECT would route whole sessions, but it conflicts with
     // the prepared-statement API the query layer is built on.)
-    QString bootstrap = QStringLiteral("ATTACH '%1' AS %2").arg(target, dialog.alias());
+    QString bootstrap = QStringLiteral("ATTACH '%1' AS %2").arg(target, alias);
     if (!token.isEmpty())
         bootstrap += QStringLiteral(" (TOKEN '%1')").arg(QString(token).replace(u'\'', QStringLiteral("''")));
     bootstrap += QLatin1Char(';');
 
-    DbSession *session = createSession(QString(), bootstrap, server, target);
-    if (!session)
+    // The ATTACH is a network operation: it runs queued on the session's
+    // worker instead of blocking the UI thread here, and the dialog shows a
+    // connecting state until the outcome arrives.
+    auto *session = new DbSession(m_nextSessionId++, this);
+    QString error;
+    if (!session->startOpen(QString(), bootstrap, server, target, &error)) {
+        // Local engine failed (no network involved): report inline and let
+        // the user correct the input.
+        delete session;
+        if (m_connectDialog)
+            m_connectDialog->showError(error);
         return;
-    activateSession(session);
-    rememberQuackTarget(server);
-    setStatusMessage(tr("Connected to %1").arg(server));
+    }
+    connectSessionRunner(session);
+    const QPointer<QuackConnectDialog> dialog = m_connectDialog;
+    connect(session, &DbSession::bootstrapFinished, this,
+            [this, session, server, dialog](bool ok, const QString &attachError) {
+                if (!ok) {
+                    session->deleteLater();
+                    if (dialog)
+                        dialog->showError(attachError);
+                    else
+                        setStatusError(attachError); // dialog gone: status bar
+                    return;
+                }
+                m_sessions.append(session);
+                m_sessionCombo->addItem(displayNameFor(session), session->id());
+                rememberQuackTarget(server);
+                setStatusMessage(tr("Connected to %1").arg(server));
+                if (dialog) {
+                    // The dialog asked for this connection; activate it and
+                    // close. If the dialog was closed while the connect was
+                    // in flight, the session still appears in the selector,
+                    // just without yanking the active connection away.
+                    activateSession(session);
+                    dialog->accept();
+                }
+            });
+    if (dialog)
+        dialog->setConnecting(true);
+    setStatusMessage(tr("Connecting to %1…").arg(server));
 }
 
 void MainWindow::serveQuackDatabase()

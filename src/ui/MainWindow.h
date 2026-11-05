@@ -2,6 +2,7 @@
 
 #include <QHash>
 #include <QMainWindow>
+#include <QPointer>
 #include <QStringList>
 
 #include "core/Catalog.h"
@@ -33,6 +34,9 @@ class QueryRunner;
 class ResultTabs;
 class SchemaTree;
 class SqlEditor;
+#ifdef DUCQ_QUACK
+class QuackConnectDialog;
+#endif
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -60,6 +64,8 @@ private slots:
     void newInMemoryConnection();
 #ifdef DUCQ_QUACK
     void connectQuackServer();
+    // Starts the async ATTACH for one connectRequested() from the dialog.
+    void beginQuackConnect(const QString &server, const QString &token, const QString &alias);
     void serveQuackDatabase();
 #endif
     void closeConnection();
@@ -91,6 +97,9 @@ private:
 
     DbSession *createSession(const QString &path, const QString &bootstrapSql = {},
                              const QString &displayName = {}, const QString &remoteTarget = {});
+    // Wires a session's worker signals to the UI slots; the runner only
+    // exists once the session is open.
+    void connectSessionRunner(ducq::DbSession *session);
     void activateSession(ducq::DbSession *session);
     void closeActiveConnection();
     DbSession *sessionById(int sessionId) const;
@@ -180,6 +189,9 @@ private:
     bool m_persistState = true; // off for headless screenshots
     bool m_statusIsError = false; // re-colored on theme switches
 #ifdef DUCQ_QUACK
+    // The connect dialog while it is open; null (via QPointer) once the user
+    // closes it, even when an ATTACH attempt it started is still in flight.
+    QPointer<QuackConnectDialog> m_connectDialog;
     // Servers started from this window, per session; the underlying
     // quack_serve instance dies with its session's database.
     QList<ducq::QuackServerEntry> m_quackServers;

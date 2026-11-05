@@ -52,6 +52,31 @@ bool DbSession::open(const QString &path, const QString &bootstrapSql, const QSt
     return true;
 }
 
+bool DbSession::startOpen(const QString &path, const QString &bootstrapSql, const QString &displayName,
+                          const QString &remoteTarget, QString *errorMessage)
+{
+    close();
+    if (!m_database.open(path, false, errorMessage))
+        return false;
+
+    m_thread = new QThread(this);
+    m_runner = new QueryRunner(&m_database); // no parent: lives in the worker
+    m_runner->moveToThread(m_thread);
+    connect(m_runner, &QueryRunner::finished, this,
+            [this](quint64, qint64, qsizetype, bool, const QString &) { --m_pending; });
+    connect(m_runner, &QueryRunner::bootstrapDone, this, &DbSession::bootstrapFinished);
+    m_thread->start();
+    QMetaObject::invokeMethod(m_runner, "initialize", Qt::BlockingQueuedConnection);
+    // Unlike open(), the bootstrap SQL is queued, not awaited: this call
+    // returns before the ATTACH has even started, and bootstrapFinished
+    // carries the outcome once the worker gets to it.
+    QMetaObject::invokeMethod(m_runner, "bootstrapAsync", Qt::QueuedConnection,
+                              Q_ARG(QString, bootstrapSql));
+    m_displayName = displayName;
+    m_remoteTarget = remoteTarget;
+    return true;
+}
+
 bool DbSession::runSync(const QString &sql, QString *errorMessage)
 {
     if (!m_runner) {

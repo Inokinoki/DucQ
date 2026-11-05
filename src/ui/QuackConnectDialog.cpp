@@ -2,6 +2,8 @@
 
 #ifdef DUCQ_QUACK
 
+#include "Theme.h"
+
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
@@ -42,12 +44,22 @@ QuackConnectDialog::QuackConnectDialog(QWidget *parent)
     m_form->addRow(QStringLiteral(" "), m_alias);
     layout->addLayout(m_form);
 
+    m_errorLabel = new QLabel(this);
+    m_errorLabel->setWordWrap(true);
+    m_errorLabel->setStyleSheet(QStringLiteral("color: %1;").arg(Theme::tokens().error.name()));
+    m_errorLabel->setVisible(false);
+    layout->addWidget(m_errorLabel);
+
     m_buttons = new QDialogButtonBox(this);
     m_buttons->addButton(QDialogButtonBox::Cancel);
-    QPushButton *connectButton = m_buttons->addButton(tr("Connect"), QDialogButtonBox::AcceptRole);
-    connect(m_buttons, &QDialogButtonBox::accepted, this, [this] {
-        // Validate before accepting: on bad input the dialog stays open (and
-        // filled) instead of closing on a connection that cannot work.
+    m_connectButton = m_buttons->addButton(tr("Connect"), QDialogButtonBox::AcceptRole);
+    // Not QDialogButtonBox::accepted: that would also fire when the owner
+    // calls accept() to close a successful connect, re-entering the handler.
+    // The button emits connectRequested instead; the owner drives accept(),
+    // setConnecting() and showError() from the attempt's real outcome.
+    connect(m_connectButton, &QPushButton::clicked, this, [this] {
+        // Validate locally first: on bad input the dialog stays open (and
+        // filled) instead of starting an attempt that cannot work.
         if (server().isEmpty()) {
             QMessageBox::warning(this, windowTitle(), tr("Enter a server address, e.g. localhost:9494."));
             return;
@@ -57,15 +69,34 @@ QuackConnectDialog::QuackConnectDialog(QWidget *parent)
                                  tr("The alias must be a plain identifier (letters, digits, underscore)."));
             return;
         }
-        accept();
+        emit connectRequested(server(), token(), alias());
     });
     connect(m_buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     layout->addWidget(m_buttons);
-    if (connectButton)
-        connectButton->setDefault(true);
+    if (m_connectButton)
+        m_connectButton->setDefault(true);
     m_server->setFocus();
 
     retranslateUi();
+}
+
+void QuackConnectDialog::setConnecting(bool connecting)
+{
+    m_connecting = connecting;
+    m_server->setEnabled(!connecting);
+    m_token->setEnabled(!connecting);
+    m_alias->setEnabled(!connecting);
+    m_connectButton->setEnabled(!connecting);
+    m_connectButton->setText(connecting ? tr("Connecting…") : tr("Connect"));
+    if (connecting)
+        m_errorLabel->setVisible(false);
+}
+
+void QuackConnectDialog::showError(const QString &message)
+{
+    setConnecting(false);
+    m_errorLabel->setText(message);
+    m_errorLabel->setVisible(true);
 }
 
 void QuackConnectDialog::setRecentTargets(const QStringList &targets)
@@ -108,6 +139,7 @@ void QuackConnectDialog::retranslateUi()
     m_server->lineEdit()->setPlaceholderText(QStringLiteral("localhost:9494"));
     m_token->setPlaceholderText(tr("Leave empty if the server has no token"));
     m_alias->setToolTip(tr("Name the remote database gets after ATTACH"));
+    m_connectButton->setText(m_connecting ? tr("Connecting…") : tr("Connect"));
     m_buttons->button(QDialogButtonBox::Cancel)->setText(tr("Cancel"));
 }
 

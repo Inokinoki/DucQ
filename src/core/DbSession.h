@@ -34,6 +34,13 @@ public:
     // created for, so the UI can dedupe reconnects.
     bool open(const QString &path, const QString &bootstrapSql, const QString &displayName,
               const QString &remoteTarget, QString *errorMessage);
+    // Asynchronous variant for remote sessions: the engine opens as in open()
+    // (fast, local), but the bootstrap SQL — typically a network ATTACH — is
+    // queued on the worker thread instead of blocking the caller. Reports via
+    // bootstrapFinished(); the session is only usable once that signal says
+    // ok. Failure leaves the session closed (safe to delete).
+    bool startOpen(const QString &path, const QString &bootstrapSql, const QString &displayName,
+                   const QString &remoteTarget, QString *errorMessage);
     // Stops the worker and closes the database. Safe to call repeatedly.
     void close();
     // Runs a statement synchronously on the worker connection and reports
@@ -48,6 +55,10 @@ public:
     bool isBusy() const { return m_pending > 0; }
     const QString &displayName() const { return m_displayName; }
     const QString &remoteTarget() const { return m_remoteTarget; }
+
+signals:
+    // Outcome of startOpen()'s bootstrap; mirrors QueryRunner::bootstrapDone.
+    void bootstrapFinished(bool ok, const QString &error);
 
 public slots:
     void runSql(quint64 queryId, const QString &sql);
