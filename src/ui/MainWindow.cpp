@@ -54,6 +54,7 @@
 #include <QUrl>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <memory>
 
 namespace ducq {
@@ -533,6 +534,19 @@ void MainWindow::changeEvent(QEvent *event)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+#ifdef DUCQ_QUACK
+    // Quitting kills every quack_serve started from this window; clients
+    // would just see their connections drop, so confirm first.
+    if (!m_quackServers.isEmpty()) {
+        const QMessageBox::StandardButton answer = QMessageBox::question(
+            this, QStringLiteral("DucQ"),
+            tr("Quack servers are still running. Quitting will disconnect their clients. Quit anyway?"));
+        if (answer != QMessageBox::Yes) {
+            event->ignore();
+            return;
+        }
+    }
+#endif
     if (m_persistState)
         saveWindowState();
     QMainWindow::closeEvent(event);
@@ -864,10 +878,21 @@ void MainWindow::closeConnection()
     DbSession *session = m_activeSession;
     if (!session || !ensureSessionIdle(session))
         return;
-    m_resultTabs->closeSessionTabs(session->id());
 #ifdef DUCQ_QUACK
-    // The session's database is going away; its quack_serve instances die
-    // with it, so forget them.
+    // The session's database is going away and its quack_serve instances die
+    // with it; make sure that is not a surprise for whoever is connected.
+    const bool serving = std::any_of(m_quackServers.cbegin(), m_quackServers.cend(),
+                                     [session](const QuackServerEntry &entry) {
+                                         return entry.sessionId == session->id();
+                                     });
+    if (serving) {
+        const QMessageBox::StandardButton answer = QMessageBox::question(
+            this, tr("Close Connection"),
+            tr("A Quack server is running on this connection. Closing it will disconnect its clients. "
+               "Close anyway?"));
+        if (answer != QMessageBox::Yes)
+            return;
+    }
     m_quackServers.removeIf([session](const QuackServerEntry &entry) {
         return entry.sessionId == session->id();
     });
