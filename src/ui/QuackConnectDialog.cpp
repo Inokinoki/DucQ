@@ -97,6 +97,9 @@ void QuackConnectDialog::showError(const QString &message)
     setConnecting(false);
     m_errorLabel->setText(message);
     m_errorLabel->setVisible(true);
+    // The label just grew by a few wrapped lines; re-fit the dialog so the
+    // full message is visible instead of clipping it at the bottom.
+    adjustSize();
 }
 
 void QuackConnectDialog::setRecentTargets(const QStringList &targets)
