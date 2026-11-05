@@ -355,6 +355,14 @@ void MainWindow::refreshThemeDependentUi()
         qobject_cast<SqlEditor *>(m_editorTabs->widget(i))->retheme();
     m_resultTabs->retheme();
     applyIcons();
+    // Combo item icons are theme-colored too.
+    for (DbSession *session : m_sessions) {
+        if (!session->remoteTarget().isEmpty()) {
+            const int index = m_sessionCombo->findData(session->id());
+            if (index >= 0)
+                m_sessionCombo->setItemIcon(index, Theme::Icons::actionIcon(Theme::Icons::Icon::Remote));
+        }
+    }
     if (m_statusIsError)
         m_messageLabel->setStyleSheet(
             QStringLiteral("color: %1;").arg(Theme::tokens().error.name()));
@@ -549,6 +557,11 @@ void MainWindow::closeEvent(QCloseEvent *event)
 #endif
     if (m_persistState)
         saveWindowState();
+#ifdef DUCQ_QUACK
+    // A connect still in flight would block shutdown on its worker thread;
+    // detach it instead and let it die with the process.
+    abandonPendingConnect();
+#endif
     QMainWindow::closeEvent(event);
 }
 
@@ -637,8 +650,19 @@ DbSession *MainWindow::createSession(const QString &path, const QString &bootstr
     }
     connectSessionRunner(session);
     m_sessions.append(session);
-    m_sessionCombo->addItem(displayNameFor(session), session->id());
+    addSessionToCombo(session);
     return session;
+}
+
+void MainWindow::addSessionToCombo(DbSession *session)
+{
+    m_sessionCombo->addItem(displayNameFor(session), session->id());
+    const int index = m_sessionCombo->count() - 1;
+    if (!session->remoteTarget().isEmpty()) {
+        // Rack glyph marks Quack connections; drawn from theme colors, so
+        // refreshThemeDependentUi() re-sets it on theme switches.
+        m_sessionCombo->setItemIcon(index, Theme::Icons::actionIcon(Theme::Icons::Icon::Remote));
+    }
 }
 
 void MainWindow::activateSession(DbSession *session)
@@ -756,9 +780,49 @@ void MainWindow::connectQuackServer()
     connect(&dialog, &QuackConnectDialog::connectRequested, this, &MainWindow::beginQuackConnect);
     // The dialog stays open while an attempt is in flight and only closes on
     // its outcome (accept on success, editable again on failure). Closing it
-    // by hand mid-flight abandons the UI, not the attempt: the handler below
-    // still keeps or drops the session depending on how the ATTACH ends.
+    // by hand mid-flight cancels: abandonPendingConnect() marks the session
+    // so its completion discards it instead of revealing it.
     dialog.exec();
+    abandonPendingConnect();
+}
+
+void MainWindow::abandonPendingConnect()
+{
+    if (!m_pendingConnectSession)
+        return;
+    DbSession *session = m_pendingConnectSession;
+    m_pendingConnectSession = nullptr;
+    m_abandonedConnects.insert(session);
+    // Best-effort interrupt: a query-phase ATTACH may stop early; one blocked
+    // in the TCP connect ignores it and just runs out its timeout.
+    session->cancel();
+    // Outlive the window: during app shutdown the session's destructor would
+    // block on its worker thread, which is still parked on the ATTACH.
+    session->setParent(nullptr);
+    // Deleted by the completion handler once the bootstrap settles; deleting
+    // here would block on that very thread.
+}
+
+QString MainWindow::friendlyConnectError(const QString &server, const QString &raw) const
+{
+    const QString lower = raw.toLower();
+    QString headline;
+    if (lower.contains(u"connection refused"))
+        headline = tr("%1 refused the connection. Is a Quack server running there?").arg(server);
+    else if (lower.contains(u"timed out") || lower.contains(u"timeout"))
+        headline = tr("Connecting to %1 timed out. Check the address and any firewall in between.").arg(server);
+    else if (lower.contains(u"unreachable") || lower.contains(u"could not resolve")
+             || lower.contains(u"nodename nor servname"))
+        headline = tr("%1 could not be resolved or reached. Check the address.").arg(server);
+    else if (lower.contains(u"token") || lower.contains(u"unauthorized") || lower.contains(u"401")
+             || lower.contains(u"403"))
+        headline = tr("The server at %1 rejected the token.").arg(server);
+    else if (lower.contains(u"ssl") || lower.contains(u"certificate") || lower.contains(u"tls"))
+        headline = tr("Secure connection to %1 failed (SSL/certificate).").arg(server);
+    if (headline.isEmpty())
+        return raw;
+    // Both: one line that says what to do, the engine text for the details.
+    return headline + QLatin1String("\n\n") + raw;
 }
 
 void MainWindow::beginQuackConnect(const QString &server, const QString &token, const QString &alias)
@@ -799,19 +863,31 @@ void MainWindow::beginQuackConnect(const QString &server, const QString &token, 
         return;
     }
     connectSessionRunner(session);
+    m_pendingConnectSession = session;
     const QPointer<QuackConnectDialog> dialog = m_connectDialog;
     connect(session, &DbSession::bootstrapFinished, this,
             [this, session, server, dialog](bool ok, const QString &attachError) {
+                if (m_pendingConnectSession == session)
+                    m_pendingConnectSession = nullptr;
+                if (m_abandonedConnects.contains(session)) {
+                    // Cancelled while in flight: discard, whatever the
+                    // outcome turned out to be.
+                    m_abandonedConnects.remove(session);
+                    session->deleteLater();
+                    setStatusMessage(tr("Cancelled connecting to %1").arg(server));
+                    return;
+                }
                 if (!ok) {
+                    const QString friendly = friendlyConnectError(server, attachError);
                     session->deleteLater();
                     if (dialog)
-                        dialog->showError(attachError);
+                        dialog->showError(friendly);
                     else
-                        setStatusError(attachError); // dialog gone: status bar
+                        setStatusError(friendly); // dialog gone: status bar
                     return;
                 }
                 m_sessions.append(session);
-                m_sessionCombo->addItem(displayNameFor(session), session->id());
+                addSessionToCombo(session);
                 rememberQuackTarget(server);
                 setStatusMessage(tr("Connected to %1").arg(server));
                 if (dialog) {

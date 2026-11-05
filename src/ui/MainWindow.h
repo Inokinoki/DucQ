@@ -3,6 +3,7 @@
 #include <QHash>
 #include <QMainWindow>
 #include <QPointer>
+#include <QSet>
 #include <QStringList>
 
 #include "core/Catalog.h"
@@ -66,7 +67,13 @@ private slots:
     void connectQuackServer();
     // Starts the async ATTACH for one connectRequested() from the dialog.
     void beginQuackConnect(const QString &server, const QString &token, const QString &alias);
+    // Discards a connect that is still in flight (dialog closed or app
+    // quitting): the session never joins the selector and is deleted once
+    // its bootstrap settles.
+    void abandonPendingConnect();
     void serveQuackDatabase();
+    // Raw ATTACH failure -> one actionable line + the original text.
+    QString friendlyConnectError(const QString &server, const QString &raw) const;
 #endif
     void closeConnection();
     void switchSession(int sessionId);
@@ -100,6 +107,9 @@ private:
     // Wires a session's worker signals to the UI slots; the runner only
     // exists once the session is open.
     void connectSessionRunner(ducq::DbSession *session);
+    // Adds the session to the connection selector, with a rack icon when it
+    // is a remote (Quack) connection.
+    void addSessionToCombo(ducq::DbSession *session);
     void activateSession(ducq::DbSession *session);
     void closeActiveConnection();
     DbSession *sessionById(int sessionId) const;
@@ -192,6 +202,11 @@ private:
     // The connect dialog while it is open; null (via QPointer) once the user
     // closes it, even when an ATTACH attempt it started is still in flight.
     QPointer<QuackConnectDialog> m_connectDialog;
+    // The session whose ATTACH the open dialog is waiting on.
+    DbSession *m_pendingConnectSession = nullptr;
+    // Cancelled connects that have not settled yet; kept so their completion
+    // handler can discard the session instead of revealing it.
+    QSet<DbSession *> m_abandonedConnects;
     // Servers started from this window, per session; the underlying
     // quack_serve instance dies with its session's database.
     QList<ducq::QuackServerEntry> m_quackServers;
