@@ -13,6 +13,7 @@
 #include <QPushButton>
 #include <QRandomGenerator>
 #include <QSpinBox>
+#include <QStyle>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -149,13 +150,22 @@ void QuackServeDialog::refreshServers()
 {
     const QList<QuackServerEntry> servers = m_list();
     m_servers->clear(); // item widgets die with their items
+    int maxRowWidth = 0;
     for (const QuackServerEntry &entry : servers) {
         auto *item = new QListWidgetItem;
         QWidget *row = serverRow(entry);
-        item->setSizeHint(row->sizeHint());
+        const QSize hint = row->sizeHint();
+        item->setSizeHint(hint);
+        maxRowWidth = qMax(maxRowWidth, hint.width());
         m_servers->addItem(item);
         m_servers->setItemWidget(item, row);
     }
+    // QListWidget's own size hint ignores its item widgets, so the dialog
+    // would open too narrow and push the row buttons behind a horizontal
+    // scrollbar (the vertical one eats into the same space once several
+    // servers run). Floor the list at the widest row plus a scrollbar.
+    m_servers->setMinimumWidth(maxRowWidth
+        + style()->pixelMetric(QStyle::PM_ScrollBarExtent, nullptr, m_servers));
     const bool empty = servers.isEmpty();
     m_servers->setVisible(!empty);
     m_serversHeader->setVisible(!empty);
