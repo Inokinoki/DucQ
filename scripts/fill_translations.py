@@ -923,6 +923,62 @@ T = {
         "pt_BR": "Conexão com %1 cancelada",
         "ru": "Подключение к %1 отменено",
     },
+    "Connection to %1 lost. Reconnect from the File menu to try again.": {
+        "zh_CN": "到 %1 的连接已丢失。请从文件菜单重连再试。",
+        "ja": "%1 への接続が失われました。ファイルメニューから再接続してください。",
+        "ko": "%1 연결이 끊겼습니다. 파일 메뉴에서 다시 연결해 보세요.",
+        "de": "Verbindung zu %1 verloren. Im Menü „Datei“ erneut verbinden, um es erneut zu versuchen.",
+        "fr": "Connexion à %1 perdue. Reconnectez-vous depuis le menu Fichier pour réessayer.",
+        "es": "Se perdió la conexión con %1. Reconecte desde el menú Archivo para intentarlo de nuevo.",
+        "pt_BR": "A conexão com %1 foi perdida. Reconecte pelo menu Arquivo para tentar novamente.",
+        "ru": "Соединение с %1 потеряно. Переподключитесь через меню «Файл», чтобы повторить попытку.",
+    },
+    "%1 (disconnected)": {
+        "zh_CN": "%1（已断开）", "ja": "%1（切断）", "ko": "%1(연결 끊김)",
+        "de": "%1 (getrennt)", "fr": "%1 (déconnecté)", "es": "%1 (desconectado)",
+        "pt_BR": "%1 (desconectado)", "ru": "%1 (отключено)",
+    },
+    "Reconnect to %1": {
+        "zh_CN": "重连到 %1", "ja": "%1 に再接続", "ko": "%1에 다시 연결",
+        "de": "Mit %1 neu verbinden", "fr": "Se reconnecter à %1", "es": "Reconectar con %1",
+        "pt_BR": "Reconectar a %1", "ru": "Переподключиться к %1",
+    },
+    "Reconnect to Server": {
+        "zh_CN": "重连到服务器", "ja": "サーバーに再接続", "ko": "서버에 다시 연결",
+        "de": "Mit Server neu verbinden", "fr": "Se reconnecter au serveur",
+        "es": "Reconectar con el servidor", "pt_BR": "Reconectar ao servidor",
+        "ru": "Переподключиться к серверу",
+    },
+    "Reconnecting to %1…": {
+        "zh_CN": "正在重连 %1…", "ja": "%1 に再接続中…", "ko": "%1에 다시 연결 중…",
+        "de": "Neuverbindung mit %1…", "fr": "Reconnexion à %1…", "es": "Reconectando con %1…",
+        "pt_BR": "Reconectando a %1…", "ru": "Переподключение к %1…",
+    },
+    "Reconnected to %1": {
+        "zh_CN": "已重新连接到 %1", "ja": "%1 に再接続しました", "ko": "%1에 다시 연결되었습니다",
+        "de": "Mit %1 neu verbunden", "fr": "Reconnecté à %1", "es": "Reconectado con %1",
+        "pt_BR": "Reconectado a %1", "ru": "Переподключено к %1",
+    },
+    "The connection is not open. Reconnect it from the File menu first.": {
+        "zh_CN": "连接未打开。请先从文件菜单重连。",
+        "ja": "接続が開いていません。先にファイルメニューから再接続してください。",
+        "ko": "연결이 열려 있지 않습니다. 먼저 파일 메뉴에서 다시 연결하세요.",
+        "de": "Die Verbindung ist nicht geöffnet. Verbinden Sie sie zuerst über das Menü „Datei“ neu.",
+        "fr": "La connexion n'est pas ouverte. Reconnectez-la d'abord depuis le menu Fichier.",
+        "es": "La conexión no está abierta. Reconéctela primero desde el menú Archivo.",
+        "pt_BR": "A conexão não está aberta. Reconecte-a primeiro pelo menu Arquivo.",
+        "ru": "Подключение не открыто. Сначала переподключите его через меню «Файл».",
+    },
+    "A connection attempt is in progress. Wait for it to finish first.": {
+        "zh_CN": "连接尝试正在进行，请先等待其完成。",
+        "ja": "接続試行が進行中です。先に完了をお待ちください。",
+        "ko": "연결 시도가 진행 중입니다. 먼저 완료될 때까지 기다려 주세요.",
+        "de": "Ein Verbindungsversuch läuft. Warten Sie zuerst auf seinen Abschluss.",
+        "fr": "Une tentative de connexion est en cours. Attendez d'abord qu'elle se termine.",
+        "es": "Hay un intento de conexión en curso. Espere primero a que termine.",
+        "pt_BR": "Uma tentativa de conexão está em andamento. Aguarde primeiro a conclusão.",
+        "ru": "Выполняется попытка подключения. Сначала дождитесь её завершения.",
+    },
 }
 
 LANGS = ["zh_CN", "ja", "ko", "de", "fr", "es", "pt_BR", "ru"]

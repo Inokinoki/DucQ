@@ -17,7 +17,7 @@
 <context>
     <name>ducq::DbSession</name>
     <message>
-        <location filename="../src/core/DbSession.cpp" line="84" />
+        <location filename="../src/core/DbSession.cpp" line="93" />
         <source>Session is not open</source>
         <translation>セッションが開いていません</translation>
     </message>
@@ -25,368 +25,408 @@
 <context>
     <name>ducq::MainWindow</name>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="154" />
-        <location filename="../src/ui/MainWindow.cpp" line="573" />
+        <location filename="../src/ui/MainWindow.cpp" line="174" />
+        <location filename="../src/ui/MainWindow.cpp" line="600" />
         <source>Query history</source>
         <translation>クエリ履歴</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="125" />
-        <location filename="../src/ui/MainWindow.cpp" line="574" />
+        <location filename="../src/ui/MainWindow.cpp" line="145" />
+        <location filename="../src/ui/MainWindow.cpp" line="601" />
         <source>Filter tables…</source>
         <translation>テーブルを絞り込み…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="577" />
+        <location filename="../src/ui/MainWindow.cpp" line="604" />
         <source>&amp;File</source>
         <translation>ファイル(&amp;F)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="578" />
+        <location filename="../src/ui/MainWindow.cpp" line="605" />
         <source>New Database…</source>
         <translation>新規データベース…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="579" />
+        <location filename="../src/ui/MainWindow.cpp" line="606" />
         <source>Open Database…</source>
         <translation>データベースを開く…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="586" />
+        <location filename="../src/ui/MainWindow.cpp" line="613" />
         <source>Export Current Results as CSV…</source>
         <translation>現在の結果を CSV としてエクスポート…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="587" />
+        <location filename="../src/ui/MainWindow.cpp" line="614" />
         <source>Export Current Results as Parquet…</source>
         <translation>現在の結果を Parquet としてエクスポート…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="589" />
+        <location filename="../src/ui/MainWindow.cpp" line="616" />
         <source>Exit</source>
         <translation>終了</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="601" />
+        <location filename="../src/ui/MainWindow.cpp" line="628" />
         <source>&amp;Language</source>
         <translation>言語(&amp;L)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="602" />
+        <location filename="../src/ui/MainWindow.cpp" line="629" />
         <source>Refresh Schema</source>
         <translation>スキーマを更新</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="610" />
+        <location filename="../src/ui/MainWindow.cpp" line="637" />
         <source>Cancel</source>
         <translation>キャンセル</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="703" />
+        <location filename="../src/ui/MainWindow.cpp" line="702" />
+        <source>%1 (disconnected)</source>
+        <translation>%1（切断）</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="775" />
         <source>A query is running. Wait for it to finish or cancel it first.</source>
         <translation>クエリを実行中です。完了を待つか、先にキャンセルしてください。</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="709" />
-        <location filename="../src/ui/MainWindow.cpp" line="723" />
+        <location filename="../src/ui/MainWindow.cpp" line="781" />
+        <location filename="../src/ui/MainWindow.cpp" line="795" />
         <source>New DuckDB Database</source>
         <translation>新規 DuckDB データベース</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="712" />
+        <location filename="../src/ui/MainWindow.cpp" line="784" />
         <source>DuckDB databases (*.duckdb *.db);;All files (*)</source>
         <translation>DuckDB データベース (*.duckdb *.db);;すべてのファイル (*)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="733" />
+        <location filename="../src/ui/MainWindow.cpp" line="805" />
         <source>Open DuckDB Database</source>
         <translation>DuckDB データベースを開く</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="734" />
+        <location filename="../src/ui/MainWindow.cpp" line="806" />
         <source>DuckDB databases (*.duckdb *.db *.ddb);;All files (*)</source>
         <translation>DuckDB データベース (*.duckdb *.db *.ddb);;すべてのファイル (*)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="647" />
+        <location filename="../src/ui/MainWindow.cpp" line="677" />
         <source>Open Failed</source>
         <translation>オープン失敗</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="572" />
+        <location filename="../src/ui/MainWindow.cpp" line="599" />
         <source>Active connection (Ctrl+Tab cycles)</source>
         <translation>アクティブな接続（Ctrl+Tab で切り替え）</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1002" />
+        <location filename="../src/ui/MainWindow.cpp" line="1120" />
         <source>Not connected</source>
         <translation>未接続</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="685" />
+        <location filename="../src/ui/MainWindow.cpp" line="748" />
         <source>In-memory database</source>
         <translation>インメモリデータベース</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="570" />
+        <location filename="../src/ui/MainWindow.cpp" line="597" />
         <source>Run</source>
         <translation>実行</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="571" />
+        <location filename="../src/ui/MainWindow.cpp" line="598" />
         <source>Run the SQL (Ctrl+⏎)</source>
         <translation>SQL を実行 (Ctrl+⏎)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="151" />
+        <location filename="../src/ui/MainWindow.cpp" line="171" />
         <source>Active connection</source>
         <translation>アクティブな接続</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="266" />
+        <location filename="../src/ui/MainWindow.cpp" line="288" />
         <source>Cursor position</source>
         <translation>カーソル位置</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="389" />
+        <location filename="../src/ui/MainWindow.cpp" line="411" />
         <source>Ln %L1, Col %L2</source>
         <translation>%L1 行 %L2 列</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="410" />
-        <location filename="../src/ui/MainWindow.cpp" line="597" />
+        <location filename="../src/ui/MainWindow.cpp" line="432" />
+        <location filename="../src/ui/MainWindow.cpp" line="624" />
         <source>Query %1</source>
         <translation>クエリ %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="426" />
+        <location filename="../src/ui/MainWindow.cpp" line="448" />
         <source>Close Query Tab</source>
         <translation>クエリタブを閉じる</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="427" />
+        <location filename="../src/ui/MainWindow.cpp" line="449" />
         <source>This tab has changes that were not executed and will be lost. Close anyway?</source>
         <translation>このタブには実行されていない変更があり、閉じると失われます。それでも閉じますか？</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="441" />
+        <location filename="../src/ui/MainWindow.cpp" line="463" />
         <source>Rename Tab</source>
         <translation>タブの名前を変更</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="442" />
+        <location filename="../src/ui/MainWindow.cpp" line="464" />
         <source>Tab name:</source>
         <translation>タブ名:</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="551" />
+        <location filename="../src/ui/MainWindow.cpp" line="573" />
         <source>Quack servers are still running. Quitting will disconnect their clients. Quit anyway?</source>
         <translation>Quack サーバーがまだ実行中です。終了するとそれらのクライアントが切断されます。終了しますか？</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="580" />
+        <location filename="../src/ui/MainWindow.cpp" line="607" />
         <source>New In-Memory Connection</source>
         <translation>新規インメモリ接続</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="582" />
+        <location filename="../src/ui/MainWindow.cpp" line="609" />
         <source>Connect to DuckDB Server…</source>
         <translation>DuckDB サーバーに接続…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="583" />
+        <location filename="../src/ui/MainWindow.cpp" line="610" />
         <source>Serve Database over Quack…</source>
         <translation>データベースを Quack で共有…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="585" />
-        <location filename="../src/ui/MainWindow.cpp" line="966" />
+        <location filename="../src/ui/MainWindow.cpp" line="612" />
+        <location filename="../src/ui/MainWindow.cpp" line="1083" />
         <source>Close Connection</source>
         <translation>接続を閉じる</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="588" />
+        <location filename="../src/ui/MainWindow.cpp" line="615" />
         <source>Close Result Tab</source>
         <translation>結果タブを閉じる</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="591" />
+        <location filename="../src/ui/MainWindow.cpp" line="618" />
         <source>New query tab (Ctrl+T)</source>
         <translation>新しいクエリタブ（Ctrl+T）</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="599" />
+        <location filename="../src/ui/MainWindow.cpp" line="626" />
         <source>&amp;Query</source>
         <translation>クエリ(&amp;Q)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="600" />
+        <location filename="../src/ui/MainWindow.cpp" line="627" />
         <source>&amp;Run SQL</source>
         <translation>SQL を実行(&amp;R)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="604" />
+        <location filename="../src/ui/MainWindow.cpp" line="631" />
         <source>&amp;View</source>
         <translation>表示(&amp;V)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="605" />
+        <location filename="../src/ui/MainWindow.cpp" line="632" />
         <source>&amp;Theme</source>
         <translation>テーマ(&amp;T)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="606" />
+        <location filename="../src/ui/MainWindow.cpp" line="633" />
         <source>Follow System</source>
         <translation>システムに従う</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="607" />
+        <location filename="../src/ui/MainWindow.cpp" line="634" />
         <source>Light</source>
         <translation>ライト</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="608" />
+        <location filename="../src/ui/MainWindow.cpp" line="635" />
         <source>Dark</source>
         <translation>ダーク</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="724" />
+        <location filename="../src/ui/MainWindow.cpp" line="712" />
+        <source>Connection to %1 lost. Reconnect from the File menu to try again.</source>
+        <translation>%1 への接続が失われました。ファイルメニューから再接続してください。</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="769" />
+        <source>A connection attempt is in progress. Wait for it to finish first.</source>
+        <translation>接続試行が進行中です。先に完了をお待ちください。</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="796" />
         <source>%1 already exists. Open it as an existing database?</source>
         <translation>%1 は既に存在します。既存のデータベースとして開きますか？</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="747" />
+        <location filename="../src/ui/MainWindow.cpp" line="819" />
         <source>Already open in another connection: %1</source>
         <translation>別の接続で既に開かれています: %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="811" />
+        <location filename="../src/ui/MainWindow.cpp" line="883" />
         <source>%1 refused the connection. Is a Quack server running there?</source>
         <translation>%1 が接続を拒否しました。そこで Quack サーバーが実行中か確認してください。</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="813" />
+        <location filename="../src/ui/MainWindow.cpp" line="885" />
         <source>Connecting to %1 timed out. Check the address and any firewall in between.</source>
         <translation>%1 への接続がタイムアウトしました。アドレスと途中のファイアウォールを確認してください。</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="816" />
+        <location filename="../src/ui/MainWindow.cpp" line="888" />
         <source>%1 could not be resolved or reached. Check the address.</source>
         <translation>%1 を解決または到達できませんでした。アドレスを確認してください。</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="819" />
+        <location filename="../src/ui/MainWindow.cpp" line="891" />
         <source>The server at %1 rejected the token.</source>
         <translation>%1 のサーバーがトークンを拒否しました。</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="821" />
+        <location filename="../src/ui/MainWindow.cpp" line="893" />
         <source>Secure connection to %1 failed (SSL/certificate).</source>
         <translation>%1 への安全な接続に失敗しました（SSL/証明書）。</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="836" />
+        <location filename="../src/ui/MainWindow.cpp" line="908" />
         <source>Already connected: %1</source>
         <translation>すでに接続中：%1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="877" />
+        <location filename="../src/ui/MainWindow.cpp" line="949" />
         <source>Cancelled connecting to %1</source>
         <translation>%1 への接続をキャンセルしました</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="892" />
+        <location filename="../src/ui/MainWindow.cpp" line="964" />
         <source>Connected to %1</source>
         <translation>%1 に接続しました</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="904" />
+        <location filename="../src/ui/MainWindow.cpp" line="976" />
         <source>Connecting to %1…</source>
         <translation>%1 に接続中…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="916" />
-        <location filename="../src/ui/MainWindow.cpp" line="930" />
+        <location filename="../src/ui/MainWindow.cpp" line="988" />
+        <location filename="../src/ui/MainWindow.cpp" line="1002" />
         <source>The connection was closed.</source>
         <translation>接続は閉じられました。</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="924" />
+        <location filename="../src/ui/MainWindow.cpp" line="996" />
         <source>Serving %1 over Quack</source>
         <translation>%1 を Quack で共有中</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="935" />
+        <location filename="../src/ui/MainWindow.cpp" line="1007" />
         <source>Stopped serving %1</source>
         <translation>%1 の共有を停止しました</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="967" />
+        <location filename="../src/ui/MainWindow.cpp" line="1030" />
+        <source>Reconnecting to %1…</source>
+        <translation>%1 に再接続中…</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="1047" />
+        <source>Reconnected to %1</source>
+        <translation>%1 に再接続しました</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="1063" />
+        <source>Reconnect to %1</source>
+        <translation>%1 に再接続</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="1064" />
+        <source>Reconnect to Server</source>
+        <translation>サーバーに再接続</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="1084" />
         <source>A Quack server is running on this connection. Closing it will disconnect its clients. Close anyway?</source>
         <translation>この接続では Quack サーバーが実行中です。閉じるとそのクライアントが切断されます。閉じますか？</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1015" />
+        <location filename="../src/ui/MainWindow.cpp" line="1133" />
         <source>Export</source>
         <translation>エクスポート</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1015" />
+        <location filename="../src/ui/MainWindow.cpp" line="1133" />
         <source>Select a finished result tab first.</source>
         <translation>まず完了した結果タブを選択してください。</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1022" />
+        <location filename="../src/ui/MainWindow.cpp" line="1140" />
         <source>Parquet (*.parquet)</source>
         <translation>Parquet (*.parquet)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1022" />
+        <location filename="../src/ui/MainWindow.cpp" line="1140" />
         <source>CSV (*.csv)</source>
         <translation>CSV (*.csv)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1023" />
+        <location filename="../src/ui/MainWindow.cpp" line="1141" />
         <source>Export Results</source>
         <translation>結果のエクスポート</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1041" />
+        <location filename="../src/ui/MainWindow.cpp" line="1159" />
         <source>No SQL to execute</source>
         <translation>実行する SQL がありません</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1065" />
+        <location filename="../src/ui/MainWindow.cpp" line="1176" />
+        <source>The connection is not open. Reconnect it from the File menu first.</source>
+        <translation>接続が開いていません。先にファイルメニューから再接続してください。</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="1189" />
         <source>Running — %1</source>
         <translation>実行中 — %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1123" />
+        <location filename="../src/ui/MainWindow.cpp" line="1247" />
         <source>Query cancelled</source>
         <translation>クエリがキャンセルされました</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1135" />
+        <location filename="../src/ui/MainWindow.cpp" line="1266" />
         <source>Done: %L1 rows · %L2 ms</source>
         <translation>完了：%L1 行 · %L2 ms</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1159" />
+        <location filename="../src/ui/MainWindow.cpp" line="1292" />
         <source>Schema refreshed: %1 tables/views</source>
         <translation>スキーマを更新しました: %1 個のテーブル/ビュー</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1186" />
+        <location filename="../src/ui/MainWindow.cpp" line="1319" />
         <source>Cancel the running query on %1</source>
         <translation>%1 で実行中のクエリをキャンセル</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1241" />
+        <location filename="../src/ui/MainWindow.cpp" line="1374" />
         <source>Cannot read script: %1</source>
         <translation>スクリプトを読み取れません: %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1287" />
+        <location filename="../src/ui/MainWindow.cpp" line="1420" />
         <source>Skipped unsupported file: %1</source>
         <translation>サポートされていないファイルをスキップしました: %1</translation>
     </message>
@@ -396,7 +436,7 @@
     <message>
         <location filename="../src/ui/QuackConnectDialog.cpp" line="55" />
         <location filename="../src/ui/QuackConnectDialog.cpp" line="90" />
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="142" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="145" />
         <source>Connect</source>
         <translation>接続</translation>
     </message>
@@ -412,42 +452,42 @@
     </message>
     <message>
         <location filename="../src/ui/QuackConnectDialog.cpp" line="90" />
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="142" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="145" />
         <source>Connecting…</source>
         <translation>接続中…</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="131" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="134" />
         <source>Connect to DuckDB Server</source>
         <translation>DuckDB サーバーに接続</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="136" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="139" />
         <source>&amp;Server address:</source>
         <translation>サーバーアドレス(&amp;S):</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="137" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="140" />
         <source>&amp;Token (optional):</source>
         <translation>トークン（省略可）(&amp;T):</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="138" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="141" />
         <source>&amp;Alias:</source>
         <translation>エイリアス(&amp;A):</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="140" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="143" />
         <source>Leave empty if the server has no token</source>
         <translation>サーバーにトークンがない場合は空のままにしてください</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="141" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="144" />
         <source>Name the remote database gets after ATTACH</source>
         <translation>ATTACH 後のリモートデータベースの名前</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackConnectDialog.cpp" line="143" />
+        <location filename="../src/ui/QuackConnectDialog.cpp" line="146" />
         <source>Cancel</source>
         <translation>キャンセル</translation>
     </message>
