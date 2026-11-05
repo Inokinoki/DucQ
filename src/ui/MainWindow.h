@@ -72,8 +72,13 @@ private slots:
     // its bootstrap settles.
     void abandonPendingConnect();
     void serveQuackDatabase();
+    // Re-opens the active session's worker with its original ATTACH after
+    // the server was marked lost.
+    void reconnectQuackServer();
     // Raw ATTACH failure -> one actionable line + the original text.
     QString friendlyConnectError(const QString &server, const QString &raw) const;
+    // File-menu item for the active session; enabled iff it is remote.
+    void updateQuackReconnectAction();
 #endif
     void closeConnection();
     void switchSession(int sessionId);
@@ -110,6 +115,11 @@ private:
     // Adds the session to the connection selector, with a rack icon when it
     // is a remote (Quack) connection.
     void addSessionToCombo(ducq::DbSession *session);
+    // The selector's text for a session: display name, plus a disconnected
+    // marker when the last remote exchange suggested the server is gone.
+    QString comboTextFor(ducq::DbSession *session) const;
+    void markDisconnected(ducq::DbSession *session);
+    void clearDisconnected(ducq::DbSession *session);
     void activateSession(ducq::DbSession *session);
     void closeActiveConnection();
     DbSession *sessionById(int sessionId) const;
@@ -172,6 +182,7 @@ private:
 #ifdef DUCQ_QUACK
     QAction *m_quackConnectAction = nullptr;
     QAction *m_quackServeAction = nullptr;
+    QAction *m_quackReconnectAction = nullptr;
 #endif
     QAction *m_closeConnectionAction = nullptr;
     QAction *m_exportCsvAction = nullptr;
@@ -186,6 +197,9 @@ private:
 
     QList<ducq::DbSession *> m_sessions;
     ducq::DbSession *m_activeSession = nullptr;
+    // Sessions whose last remote exchange looked like a connection loss.
+    // A successful query clears the mark (the server may have come back).
+    QSet<int> m_disconnectedSessions;
     int m_nextSessionId = 1;
     quint64 m_nextQueryId = 1; // globally unique across sessions
     int m_busyCount = 0;

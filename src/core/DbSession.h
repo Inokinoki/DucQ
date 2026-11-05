@@ -41,6 +41,14 @@ public:
     // ok. Failure leaves the session closed (safe to delete).
     bool startOpen(const QString &path, const QString &bootstrapSql, const QString &displayName,
                    const QString &remoteTarget, QString *errorMessage);
+    // The SQL the session was opened with (for remote sessions the ATTACH,
+    // token included). Lives in memory only, like the token itself; the UI
+    // reuses it to re-open the session when the server comes back.
+    const QString &bootstrapSql() const { return m_bootstrapSql; }
+    // True while startOpen()'s bootstrap is queued or running on the worker:
+    // closing or re-opening the session in that window would block the UI
+    // thread behind the in-flight ATTACH.
+    bool isBootstrapping() const { return m_bootstrapping; }
     // Stops the worker and closes the database. Safe to call repeatedly.
     void close();
     // Runs a statement synchronously on the worker connection and reports
@@ -65,6 +73,9 @@ public slots:
     void refreshCatalog();
     void cancel();
 
+private slots:
+    void onBootstrapDone(bool ok, const QString &error);
+
 private:
     int m_id;
     Database m_database;
@@ -73,6 +84,8 @@ private:
     int m_pending = 0;
     QString m_displayName;
     QString m_remoteTarget;
+    QString m_bootstrapSql;
+    bool m_bootstrapping = false;
 };
 
 } // namespace ducq
