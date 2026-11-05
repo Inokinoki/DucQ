@@ -26,114 +26,114 @@
     <name>ducq::MainWindow</name>
     <message>
         <location filename="../src/ui/MainWindow.cpp" line="154" />
-        <location filename="../src/ui/MainWindow.cpp" line="560" />
+        <location filename="../src/ui/MainWindow.cpp" line="573" />
         <source>Query history</source>
         <translation>쿼리 기록</translation>
     </message>
     <message>
         <location filename="../src/ui/MainWindow.cpp" line="125" />
-        <location filename="../src/ui/MainWindow.cpp" line="561" />
+        <location filename="../src/ui/MainWindow.cpp" line="574" />
         <source>Filter tables…</source>
         <translation>테이블 필터…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="564" />
+        <location filename="../src/ui/MainWindow.cpp" line="577" />
         <source>&amp;File</source>
         <translation>파일(&amp;F)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="565" />
+        <location filename="../src/ui/MainWindow.cpp" line="578" />
         <source>New Database…</source>
         <translation>새 데이터베이스…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="566" />
+        <location filename="../src/ui/MainWindow.cpp" line="579" />
         <source>Open Database…</source>
         <translation>데이터베이스 열기…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="573" />
+        <location filename="../src/ui/MainWindow.cpp" line="586" />
         <source>Export Current Results as CSV…</source>
         <translation>현재 결과를 CSV로 내보내기…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="574" />
+        <location filename="../src/ui/MainWindow.cpp" line="587" />
         <source>Export Current Results as Parquet…</source>
         <translation>현재 결과를 Parquet로 내보내기…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="576" />
+        <location filename="../src/ui/MainWindow.cpp" line="589" />
         <source>Exit</source>
         <translation>종료</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="588" />
+        <location filename="../src/ui/MainWindow.cpp" line="601" />
         <source>&amp;Language</source>
         <translation>언어(&amp;L)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="589" />
+        <location filename="../src/ui/MainWindow.cpp" line="602" />
         <source>Refresh Schema</source>
         <translation>스키마 새로 고침</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="597" />
+        <location filename="../src/ui/MainWindow.cpp" line="610" />
         <source>Cancel</source>
         <translation>취소</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="679" />
+        <location filename="../src/ui/MainWindow.cpp" line="703" />
         <source>A query is running. Wait for it to finish or cancel it first.</source>
         <translation>쿼리가 실행 중입니다. 완료를 기다리거나 먼저 취소해 주세요.</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="685" />
-        <location filename="../src/ui/MainWindow.cpp" line="699" />
+        <location filename="../src/ui/MainWindow.cpp" line="709" />
+        <location filename="../src/ui/MainWindow.cpp" line="723" />
         <source>New DuckDB Database</source>
         <translation>새 DuckDB 데이터베이스</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="688" />
+        <location filename="../src/ui/MainWindow.cpp" line="712" />
         <source>DuckDB databases (*.duckdb *.db);;All files (*)</source>
         <translation>DuckDB 데이터베이스 (*.duckdb *.db);;모든 파일 (*)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="709" />
+        <location filename="../src/ui/MainWindow.cpp" line="733" />
         <source>Open DuckDB Database</source>
         <translation>DuckDB 데이터베이스 열기</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="710" />
+        <location filename="../src/ui/MainWindow.cpp" line="734" />
         <source>DuckDB databases (*.duckdb *.db *.ddb);;All files (*)</source>
         <translation>DuckDB 데이터베이스 (*.duckdb *.db *.ddb);;모든 파일 (*)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="634" />
+        <location filename="../src/ui/MainWindow.cpp" line="647" />
         <source>Open Failed</source>
         <translation>열기 실패</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="559" />
+        <location filename="../src/ui/MainWindow.cpp" line="572" />
         <source>Active connection (Ctrl+Tab cycles)</source>
         <translation>활성 연결(Ctrl+Tab으로 전환)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="926" />
+        <location filename="../src/ui/MainWindow.cpp" line="1002" />
         <source>Not connected</source>
         <translation>연결되지 않음</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="661" />
+        <location filename="../src/ui/MainWindow.cpp" line="685" />
         <source>In-memory database</source>
         <translation>인메모리 데이터베이스</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="557" />
+        <location filename="../src/ui/MainWindow.cpp" line="570" />
         <source>Run</source>
         <translation>실행</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="558" />
+        <location filename="../src/ui/MainWindow.cpp" line="571" />
         <source>Run the SQL (Ctrl+⏎)</source>
         <translation>SQL 실행 (Ctrl+⏎)</translation>
     </message>
@@ -148,215 +148,245 @@
         <translation>커서 위치</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="381" />
+        <location filename="../src/ui/MainWindow.cpp" line="389" />
         <source>Ln %L1, Col %L2</source>
         <translation>%L1행 %L2열</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="402" />
-        <location filename="../src/ui/MainWindow.cpp" line="584" />
+        <location filename="../src/ui/MainWindow.cpp" line="410" />
+        <location filename="../src/ui/MainWindow.cpp" line="597" />
         <source>Query %1</source>
         <translation>쿼리 %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="418" />
+        <location filename="../src/ui/MainWindow.cpp" line="426" />
         <source>Close Query Tab</source>
         <translation>쿼리 탭 닫기</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="419" />
+        <location filename="../src/ui/MainWindow.cpp" line="427" />
         <source>This tab has changes that were not executed and will be lost. Close anyway?</source>
         <translation>이 탭에는 실행되지 않은 변경 사항이 있으며 닫으면 사라집니다. 그래도 닫시겠습니까?</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="433" />
+        <location filename="../src/ui/MainWindow.cpp" line="441" />
         <source>Rename Tab</source>
         <translation>탭 이름 바꾸기</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="434" />
+        <location filename="../src/ui/MainWindow.cpp" line="442" />
         <source>Tab name:</source>
         <translation>탭 이름:</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="543" />
+        <location filename="../src/ui/MainWindow.cpp" line="551" />
         <source>Quack servers are still running. Quitting will disconnect their clients. Quit anyway?</source>
         <translation>Quack 서버가 아직 실행 중입니다. 종료하면 클라이언트 연결이 끊깁니다. 그래도 종료하시겠습니까?</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="567" />
+        <location filename="../src/ui/MainWindow.cpp" line="580" />
         <source>New In-Memory Connection</source>
         <translation>새 인메모리 연결</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="569" />
+        <location filename="../src/ui/MainWindow.cpp" line="582" />
         <source>Connect to DuckDB Server…</source>
         <translation>DuckDB 서버에 연결…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="570" />
+        <location filename="../src/ui/MainWindow.cpp" line="583" />
         <source>Serve Database over Quack…</source>
         <translation>Quack으로 데이터베이스 공유…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="572" />
-        <location filename="../src/ui/MainWindow.cpp" line="890" />
+        <location filename="../src/ui/MainWindow.cpp" line="585" />
+        <location filename="../src/ui/MainWindow.cpp" line="966" />
         <source>Close Connection</source>
         <translation>연결 닫기</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="575" />
+        <location filename="../src/ui/MainWindow.cpp" line="588" />
         <source>Close Result Tab</source>
         <translation>결과 탭 닫기</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="578" />
+        <location filename="../src/ui/MainWindow.cpp" line="591" />
         <source>New query tab (Ctrl+T)</source>
         <translation>새 쿼리 탭(Ctrl+T)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="586" />
+        <location filename="../src/ui/MainWindow.cpp" line="599" />
         <source>&amp;Query</source>
         <translation>쿼리(&amp;Q)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="587" />
+        <location filename="../src/ui/MainWindow.cpp" line="600" />
         <source>&amp;Run SQL</source>
         <translation>SQL 실행(&amp;R)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="591" />
+        <location filename="../src/ui/MainWindow.cpp" line="604" />
         <source>&amp;View</source>
         <translation>보기(&amp;V)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="592" />
+        <location filename="../src/ui/MainWindow.cpp" line="605" />
         <source>&amp;Theme</source>
         <translation>테마(&amp;T)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="593" />
+        <location filename="../src/ui/MainWindow.cpp" line="606" />
         <source>Follow System</source>
         <translation>시스템 따르기</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="594" />
+        <location filename="../src/ui/MainWindow.cpp" line="607" />
         <source>Light</source>
         <translation>라이트</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="595" />
+        <location filename="../src/ui/MainWindow.cpp" line="608" />
         <source>Dark</source>
         <translation>다크</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="700" />
+        <location filename="../src/ui/MainWindow.cpp" line="724" />
         <source>%1 already exists. Open it as an existing database?</source>
         <translation>%1이(가) 이미 있습니다. 기존 데이터베이스로 열까요?</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="723" />
+        <location filename="../src/ui/MainWindow.cpp" line="747" />
         <source>Already open in another connection: %1</source>
         <translation>다른 연결에서 이미 열려 있음: %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="772" />
+        <location filename="../src/ui/MainWindow.cpp" line="811" />
+        <source>%1 refused the connection. Is a Quack server running there?</source>
+        <translation>%1이(가) 연결을 거부했습니다. 그 주소에서 Quack 서버가 실행 중인지 확인하세요.</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="813" />
+        <source>Connecting to %1 timed out. Check the address and any firewall in between.</source>
+        <translation>%1 연결 시간이 초과되었습니다. 주소와 방화벽을 확인하세요.</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="816" />
+        <source>%1 could not be resolved or reached. Check the address.</source>
+        <translation>%1을(를) 확인하거나 접근할 수 없습니다. 주소를 확인하세요.</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="819" />
+        <source>The server at %1 rejected the token.</source>
+        <translation>%1 서버가 토큰을 거부했습니다.</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="821" />
+        <source>Secure connection to %1 failed (SSL/certificate).</source>
+        <translation>%1에 대한 보안 연결이 실패했습니다(SSL/인증서).</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="836" />
         <source>Already connected: %1</source>
         <translation>이미 연결됨: %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="816" />
+        <location filename="../src/ui/MainWindow.cpp" line="877" />
+        <source>Cancelled connecting to %1</source>
+        <translation>%1 연결이 취소되었습니다</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/MainWindow.cpp" line="892" />
         <source>Connected to %1</source>
         <translation>%1에 연결됨</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="828" />
+        <location filename="../src/ui/MainWindow.cpp" line="904" />
         <source>Connecting to %1…</source>
         <translation>%1에 연결 중…</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="840" />
-        <location filename="../src/ui/MainWindow.cpp" line="854" />
+        <location filename="../src/ui/MainWindow.cpp" line="916" />
+        <location filename="../src/ui/MainWindow.cpp" line="930" />
         <source>The connection was closed.</source>
         <translation>연결이 닫혔습니다.</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="848" />
+        <location filename="../src/ui/MainWindow.cpp" line="924" />
         <source>Serving %1 over Quack</source>
         <translation>%1을(를) Quack으로 공유 중</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="859" />
+        <location filename="../src/ui/MainWindow.cpp" line="935" />
         <source>Stopped serving %1</source>
         <translation>%1 공유 중지됨</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="891" />
+        <location filename="../src/ui/MainWindow.cpp" line="967" />
         <source>A Quack server is running on this connection. Closing it will disconnect its clients. Close anyway?</source>
         <translation>이 연결에서 Quack 서버가 실행 중입니다. 닫으면 클라이언트 연결이 끊깁니다. 그래도 닫시겠습니까?</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="939" />
+        <location filename="../src/ui/MainWindow.cpp" line="1015" />
         <source>Export</source>
         <translation>내보내기</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="939" />
+        <location filename="../src/ui/MainWindow.cpp" line="1015" />
         <source>Select a finished result tab first.</source>
         <translation>먼저 완료된 결과 탭을 선택해 주세요.</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="946" />
+        <location filename="../src/ui/MainWindow.cpp" line="1022" />
         <source>Parquet (*.parquet)</source>
         <translation>Parquet (*.parquet)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="946" />
+        <location filename="../src/ui/MainWindow.cpp" line="1022" />
         <source>CSV (*.csv)</source>
         <translation>CSV (*.csv)</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="947" />
+        <location filename="../src/ui/MainWindow.cpp" line="1023" />
         <source>Export Results</source>
         <translation>결과 내보내기</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="965" />
+        <location filename="../src/ui/MainWindow.cpp" line="1041" />
         <source>No SQL to execute</source>
         <translation>실행할 SQL이 없습니다</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="989" />
+        <location filename="../src/ui/MainWindow.cpp" line="1065" />
         <source>Running — %1</source>
         <translation>실행 중 — %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1047" />
+        <location filename="../src/ui/MainWindow.cpp" line="1123" />
         <source>Query cancelled</source>
         <translation>쿼리가 취소되었습니다</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1059" />
+        <location filename="../src/ui/MainWindow.cpp" line="1135" />
         <source>Done: %L1 rows · %L2 ms</source>
         <translation>완료: %L1행 · %L2 ms</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1083" />
+        <location filename="../src/ui/MainWindow.cpp" line="1159" />
         <source>Schema refreshed: %1 tables/views</source>
         <translation>스키마 새로 고침 완료: 테이블/뷰 %1개</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1110" />
+        <location filename="../src/ui/MainWindow.cpp" line="1186" />
         <source>Cancel the running query on %1</source>
         <translation>%1에서 실행 중인 쿼리 취소</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1165" />
+        <location filename="../src/ui/MainWindow.cpp" line="1241" />
         <source>Cannot read script: %1</source>
         <translation>스크립트를 읽을 수 없습니다: %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="1211" />
+        <location filename="../src/ui/MainWindow.cpp" line="1287" />
         <source>Skipped unsupported file: %1</source>
         <translation>지원되지 않는 파일 건너뜀: %1</translation>
     </message>
@@ -425,22 +455,22 @@
 <context>
     <name>ducq::QuackServeDialog</name>
     <message>
-        <location filename="../src/ui/QuackServeDialog.cpp" line="107" />
+        <location filename="../src/ui/QuackServeDialog.cpp" line="108" />
         <source>token: %1</source>
         <translation>토큰: %1</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackServeDialog.cpp" line="113" />
+        <location filename="../src/ui/QuackServeDialog.cpp" line="114" />
         <source>Copy token</source>
         <translation>토큰 복사</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackServeDialog.cpp" line="133" />
+        <location filename="../src/ui/QuackServeDialog.cpp" line="134" />
         <source>Stop server</source>
         <translation>서버 중지</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackServeDialog.cpp" line="167" />
+        <location filename="../src/ui/QuackServeDialog.cpp" line="177" />
         <source>Serve Database over Quack</source>
         <translation>Quack으로 데이터베이스 공유</translation>
     </message>
@@ -449,12 +479,12 @@
         <translation type="vanished">현재 연결의 데이터베이스를 공유하는 중</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackServeDialog.cpp" line="173" />
+        <location filename="../src/ui/QuackServeDialog.cpp" line="183" />
         <source>&amp;Port:</source>
         <translation>포트(&amp;P):</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackServeDialog.cpp" line="174" />
+        <location filename="../src/ui/QuackServeDialog.cpp" line="184" />
         <source>&amp;Token:</source>
         <translation>토큰(&amp;T):</translation>
     </message>
@@ -463,47 +493,47 @@
         <translation type="vanished">이 머신의 클라이언트는 quack:localhost:&lt;포트&gt;로 연결합니다</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackServeDialog.cpp" line="67" />
+        <location filename="../src/ui/QuackServeDialog.cpp" line="68" />
         <source>The token must be at least 4 characters long.</source>
         <translation>토큰은 4자 이상이어야 합니다.</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackServeDialog.cpp" line="125" />
+        <location filename="../src/ui/QuackServeDialog.cpp" line="126" />
         <source>Copy ATTACH statement</source>
         <translation>ATTACH 문 복사</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackServeDialog.cpp" line="168" />
+        <location filename="../src/ui/QuackServeDialog.cpp" line="178" />
         <source>Sharing %1</source>
         <translation>%1 공유 중</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackServeDialog.cpp" line="176" />
+        <location filename="../src/ui/QuackServeDialog.cpp" line="186" />
         <source>Binds to localhost only; clients on this machine attach via quack:localhost:&lt;port&gt;</source>
         <translation>localhost에만 바인딩됩니다. 이 컴퓨터의 클라이언트는 quack:localhost:&lt;port&gt;로 연결합니다</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackServeDialog.cpp" line="177" />
+        <location filename="../src/ui/QuackServeDialog.cpp" line="187" />
         <source>Clients must present this token to attach</source>
         <translation>클라이언트가 연결하려면 이 토큰이 필요합니다</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackServeDialog.cpp" line="178" />
+        <location filename="../src/ui/QuackServeDialog.cpp" line="188" />
         <source>Start Server</source>
         <translation>서버 시작</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackServeDialog.cpp" line="179" />
+        <location filename="../src/ui/QuackServeDialog.cpp" line="189" />
         <source>Running servers</source>
         <translation>실행 중인 서버</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackServeDialog.cpp" line="180" />
+        <location filename="../src/ui/QuackServeDialog.cpp" line="190" />
         <source>No servers are running.</source>
         <translation>실행 중인 서버가 없습니다.</translation>
     </message>
     <message>
-        <location filename="../src/ui/QuackServeDialog.cpp" line="183" />
+        <location filename="../src/ui/QuackServeDialog.cpp" line="193" />
         <source>Close</source>
         <translation>닫기</translation>
     </message>
