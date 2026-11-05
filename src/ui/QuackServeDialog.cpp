@@ -11,11 +11,24 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QRandomGenerator>
 #include <QSpinBox>
 #include <QToolButton>
 #include <QVBoxLayout>
 
 namespace ducq {
+
+namespace {
+// 128 random bits, hex encoded — well above the server's 4-character
+// minimum and comfortable to copy by hand.
+QString generateToken()
+{
+    QString hex;
+    for (int i = 0; i < 4; ++i)
+        hex += QString::number(QRandomGenerator::system()->generate(), 16).rightJustified(8, u'0');
+    return hex;
+}
+} // namespace
 
 QuackServeDialog::QuackServeDialog(const QString &databaseLabel, const QList<QuackServerEntry> &servers,
                                    StartFn start, StopFn stop, ListFn list, QWidget *parent)
@@ -23,6 +36,7 @@ QuackServeDialog::QuackServeDialog(const QString &databaseLabel, const QList<Qua
     , m_start(std::move(start))
     , m_stop(std::move(stop))
     , m_list(std::move(list))
+    , m_databaseName(databaseLabel)
 {
     auto *layout = new QVBoxLayout(this);
 
@@ -37,12 +51,23 @@ QuackServeDialog::QuackServeDialog(const QString &databaseLabel, const QList<Qua
     m_port->setValue(9494);
     m_form->addRow(QStringLiteral(" "), m_port);
     m_token = new QLineEdit(this);
+    // Prefilled so the safe path (token-authenticated server) is the default;
+    // cleared by hand it still means "no token", which quack_serve rejects.
+    m_token->setText(generateToken());
     m_form->addRow(QStringLiteral(" "), m_token);
     layout->addLayout(m_form);
 
     m_startButton = new QPushButton(this);
     connect(m_startButton, &QPushButton::clicked, this, [this] {
-        const QString error = m_start(m_port->value(), m_token->text().trimmed());
+        const QString token = m_token->text().trimmed();
+        // Mirror the server's own minimum (QuackServer::ValidateToken):
+        // catching it here keeps the dialog open instead of surfacing a raw
+        // engine error after the fact.
+        if (!token.isEmpty() && token.size() < 4) {
+            QMessageBox::warning(this, windowTitle(), tr("The token must be at least 4 characters long."));
+            return;
+        }
+        const QString error = m_start(m_port->value(), token);
         if (!error.isEmpty()) {
             QMessageBox::warning(this, windowTitle(), error);
             return;
@@ -91,6 +116,18 @@ QWidget *QuackServeDialog::serverRow(const QuackServerEntry &entry)
     });
     tokenLine->addWidget(copyButton);
 
+    // The full statement a client needs, ready to paste into any DuckDB —
+    // saves assembling host, port and token by hand on the other side.
+    const QString attachSql = QStringLiteral("ATTACH '%1' AS remote (TOKEN '%2');")
+                                  .arg(entry.uri, QString(entry.token).replace(u'\'', QStringLiteral("''")));
+    auto *attachButton = new QToolButton(row);
+    attachButton->setText(QStringLiteral("SQL"));
+    attachButton->setToolTip(tr("Copy ATTACH statement"));
+    connect(attachButton, &QToolButton::clicked, row, [attachSql] {
+        QGuiApplication::clipboard()->setText(attachSql);
+    });
+    tokenLine->addWidget(attachButton);
+
     auto *stopButton = new QToolButton(row);
     stopButton->setText(QStringLiteral("⏻"));
     stopButton->setToolTip(tr("Stop server"));
@@ -128,14 +165,15 @@ void QuackServeDialog::refreshServers()
 void QuackServeDialog::retranslateUi()
 {
     setWindowTitle(tr("Serve Database over Quack"));
-    m_databaseLabel->setText(tr("Sharing the database of the active connection"));
+    m_databaseLabel->setText(tr("Sharing %1").arg(m_databaseName));
     const auto setLabel = [this](QWidget *field, const QString &text) {
         if (auto *label = qobject_cast<QLabel *>(m_form->labelForField(field)))
             label->setText(text);
     };
     setLabel(m_port, tr("&Port:"));
     setLabel(m_token, tr("&Token:"));
-    m_port->setToolTip(tr("Clients on this machine attach via quack:localhost:<port>"));
+    m_port->setToolTip(
+        tr("Binds to localhost only; clients on this machine attach via quack:localhost:<port>"));
     m_token->setToolTip(tr("Clients must present this token to attach"));
     m_startButton->setText(tr("Start Server"));
     m_serversHeader->setText(tr("Running servers"));

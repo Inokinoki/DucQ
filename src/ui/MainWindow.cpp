@@ -39,7 +39,6 @@
 #include <QProgressBar>
 #include <QPlainTextEdit>
 #include <QPushButton>
-#include <QRandomGenerator>
 #include <QSettings>
 #include <QShortcut>
 #include <QSplitter>
@@ -765,16 +764,6 @@ void MainWindow::connectQuackServer()
     activateSession(session);
     rememberQuackTarget(server);
     setStatusMessage(tr("Connected to %1").arg(server));
-}
-
-QString MainWindow::generateQuackToken() const
-{
-    // 128 random bits, hex encoded — well above the server's 4-character
-    // minimum and comfortable to copy by hand.
-    QString hex;
-    for (int i = 0; i < 4; ++i)
-        hex += QString::number(QRandomGenerator::system()->generate(), 16).rightJustified(8, u'0');
-    return hex;
 }
 
 void MainWindow::serveQuackDatabase()

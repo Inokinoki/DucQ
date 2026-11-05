@@ -115,7 +115,6 @@ private:
 #ifdef DUCQ_QUACK
     QStringList quackRecentTargets() const;
     void rememberQuackTarget(const QString &server);
-    QString generateQuackToken() const;
 #endif
     void setStatusMessage(const QString &message);
     void setStatusError(const QString &message);
