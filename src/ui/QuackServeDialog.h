@@ -48,6 +48,7 @@ private:
     QWidget *serverRow(const QuackServerEntry &entry);
 
     QLabel *m_databaseLabel = nullptr;
+    QString m_databaseName; // shown in m_databaseLabel; survives retranslateUi
     QFormLayout *m_form = nullptr;
     QSpinBox *m_port = nullptr;
     QLineEdit *m_token = nullptr;

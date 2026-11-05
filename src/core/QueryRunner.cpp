@@ -87,6 +87,12 @@ void QueryRunner::bootstrap(const QString &sql)
         m_bootstrapError = tr("Execution failed");
 }
 
+void QueryRunner::bootstrapAsync(const QString &sql)
+{
+    bootstrap(sql);
+    emit bootstrapDone(m_bootstrapOk, m_bootstrapError);
+}
+
 void QueryRunner::emitProgressThrottled(quint64 queryId, const QElapsedTimer &timer, qint64 &lastEmitMs)
 {
     const qint64 now = timer.elapsed();

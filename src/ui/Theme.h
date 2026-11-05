@@ -41,7 +41,7 @@ QPalette paletteFor(const Tokens &t);
 // colors — no resource files, recolored for free when the theme changes.
 namespace Icons {
 
-enum class Icon { Open, NewDatabase, Refresh, Run, Cancel, Duck };
+enum class Icon { Open, NewDatabase, Refresh, Run, Cancel, Duck, Remote };
 
 // Toolbar/action icon using the current theme's text color.
 QIcon actionIcon(Icon which);

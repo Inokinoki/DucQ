@@ -29,7 +29,8 @@
 
 - 打开 / 新建 `.duckdb` 数据库文件，内置内存数据库开箱即用
 - 作为**远程 DuckDB 服务器的客户端**（文件 → 连接到 DuckDB 服务器…）：经 DuckDB 的 **Quack** 协议 ATTACH 远端（`ATTACH 'quack:host:9494' AS remote`）——远端表并入 schema 树，`FROM remote.main.t` 之类的查询在服务端执行并带过滤/投影下推；支持可选 token，记住最近连接的服务器（token 绝不落盘）；默认内置，`-DDUCQ_QUACK=OFF` 可编译去除
-- **把自己的库通过 Quack 分享出去**（文件 → 通过 Quack 共享数据库…）：为当前连接在指定端口上启动服务器并生成 token，别处的 DucQ（或任意 DuckDB）可以直接 attach 过来查询
+- Quack 连接断开后会在连接选择器中标记 **（已断开）**，可从文件菜单重连（在新会话上重放原始 ATTACH）
+- **把自己的库通过 Quack 分享出去**（文件 → 通过 Quack 共享数据库…）：为当前连接在指定端口上启动服务器并预填生成的 token，本机上的其他 DucQ（或任意 DuckDB）可以直接 attach 过来查询；对话框只绑定 localhost，跨机器共享需在 SQL 编辑器中执行 `CALL quack_serve('quack:<host>:<port>', allow_other_hostname => true)`（非 localhost 默认走 HTTPS）
 - 通过 SQL 查询多种远端后端：`ATTACH` 支持 **Postgres、MySQL/MariaDB 和 SQLite 文件**；httpfs 直接读云存储与 URL（`read_parquet('s3://bucket/data.parquet')`、`read_csv('https://…')`）；`read_xlsx()` 查 Excel；湖仓格式经 **DuckLake** 与 **Delta Lake**（`ATTACH 'lake.db' AS lake (TYPE DUCKLAKE)` / `read_delta('s3://…')`）；attached 的表会出现在 schema 树中
 - 内置全文搜索（`PRAGMA create_fts_index` + `match_bm25`）与向量相似度检索（HNSW 索引）
 - 支持多个并发连接，每个连接独立工作线程 —— 通过执行按钮旁的选择器或 `Ctrl+Tab` 切换（SQL 层 `ATTACH` 同样可用）

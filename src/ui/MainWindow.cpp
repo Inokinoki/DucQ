@@ -39,7 +39,6 @@
 #include <QProgressBar>
 #include <QPlainTextEdit>
 #include <QPushButton>
-#include <QRandomGenerator>
 #include <QSettings>
 #include <QShortcut>
 #include <QSplitter>
@@ -55,6 +54,7 @@
 #include <QUrl>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <memory>
 
 namespace ducq {
@@ -83,6 +83,26 @@ QString translationResourcePath(const QString &code)
 {
     return QStringLiteral(":/i18n/ducq_%1.qm").arg(code);
 }
+
+#ifdef DUCQ_QUACK
+// Errors whose text suggests the remote side (or the way to it) is gone —
+// as opposed to ordinary SQL failures. Heuristic on the engine's message:
+// a false mark self-heals on the next successful query.
+bool looksLikeConnectionError(const QString &error)
+{
+    static const char *kNeedles[] = {
+        "connection refused", "timed out", "timeout", "unreachable",
+        "could not resolve", "nodename nor servname", "reset by peer",
+        "broken pipe", "connection closed", "lost connection", "handshake",
+    };
+    const QString lower = error.toLower();
+    for (const char *needle : kNeedles) {
+        if (lower.contains(QLatin1String(needle)))
+            return true;
+    }
+    return false;
+}
+#endif
 
 } // namespace
 
@@ -224,6 +244,8 @@ void MainWindow::buildUi()
     connect(m_quackConnectAction, &QAction::triggered, this, &MainWindow::connectQuackServer);
     m_quackServeAction = m_fileMenu->addAction(QString());
     connect(m_quackServeAction, &QAction::triggered, this, &MainWindow::serveQuackDatabase);
+    m_quackReconnectAction = m_fileMenu->addAction(QString());
+    connect(m_quackReconnectAction, &QAction::triggered, this, &MainWindow::reconnectQuackServer);
 #endif
     m_closeConnectionAction = m_fileMenu->addAction(QString());
     connect(m_closeConnectionAction, &QAction::triggered, this, &MainWindow::closeConnection);
@@ -355,6 +377,14 @@ void MainWindow::refreshThemeDependentUi()
         qobject_cast<SqlEditor *>(m_editorTabs->widget(i))->retheme();
     m_resultTabs->retheme();
     applyIcons();
+    // Combo item icons are theme-colored too.
+    for (DbSession *session : m_sessions) {
+        if (!session->remoteTarget().isEmpty()) {
+            const int index = m_sessionCombo->findData(session->id());
+            if (index >= 0)
+                m_sessionCombo->setItemIcon(index, Theme::Icons::actionIcon(Theme::Icons::Icon::Remote));
+        }
+    }
     if (m_statusIsError)
         m_messageLabel->setStyleSheet(
             QStringLiteral("color: %1;").arg(Theme::tokens().error.name()));
@@ -534,8 +564,31 @@ void MainWindow::changeEvent(QEvent *event)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+#ifdef DUCQ_QUACK
+    // Quitting kills every quack_serve started from this window; clients
+    // would just see their connections drop, so confirm first.
+    if (!m_quackServers.isEmpty()) {
+        const QMessageBox::StandardButton answer = QMessageBox::question(
+            this, QStringLiteral("DucQ"),
+            tr("Quack servers are still running. Quitting will disconnect their clients. Quit anyway?"));
+        if (answer != QMessageBox::Yes) {
+            event->ignore();
+            return;
+        }
+    }
+#endif
     if (m_persistState)
         saveWindowState();
+#ifdef DUCQ_QUACK
+    // A connect still in flight would block shutdown on its worker thread;
+    // detach it instead and let it die with the process.
+    abandonPendingConnect();
+    // Same for a reconnect attempt, which owns a listed session.
+    for (DbSession *session : m_sessions) {
+        if (session->isBootstrapping())
+            session->setParent(nullptr);
+    }
+#endif
     QMainWindow::closeEvent(event);
 }
 
@@ -585,21 +638,16 @@ void MainWindow::retranslateUi()
     for (DbSession *session : m_sessions) {
         const int index = m_sessionCombo->findData(session->id());
         if (index >= 0)
-            m_sessionCombo->setItemText(index, displayNameFor(session));
+            m_sessionCombo->setItemText(index, comboTextFor(session));
     }
     updateConnectionLabel();
+#ifdef DUCQ_QUACK
+    updateQuackReconnectAction();
+#endif
 }
 
-DbSession *MainWindow::createSession(const QString &path, const QString &bootstrapSql,
-                                     const QString &displayName, const QString &remoteTarget)
+void MainWindow::connectSessionRunner(DbSession *session)
 {
-    auto *session = new DbSession(m_nextSessionId++, this);
-    QString error;
-    if (!session->open(path, bootstrapSql, displayName, remoteTarget, &error)) {
-        QMessageBox::critical(this, tr("Open Failed"), error);
-        delete session;
-        return nullptr;
-    }
     // The runner only exists once the session is open.
     connect(session->runner(), &QueryRunner::resultReady, this,
             [this, session](quint64 qid, quintptr resultPtr, const QVector<ducq::ColumnMeta> &columns) {
@@ -618,10 +666,63 @@ DbSession *MainWindow::createSession(const QString &path, const QString &bootstr
             [this, session](const QVector<ducq::TableInfo> &tables) {
                 onCatalogReady(session->id(), tables);
             });
+}
 
+DbSession *MainWindow::createSession(const QString &path, const QString &bootstrapSql,
+                                     const QString &displayName, const QString &remoteTarget)
+{
+    auto *session = new DbSession(m_nextSessionId++, this);
+    QString error;
+    if (!session->open(path, bootstrapSql, displayName, remoteTarget, &error)) {
+        QMessageBox::critical(this, tr("Open Failed"), error);
+        delete session;
+        return nullptr;
+    }
+    connectSessionRunner(session);
     m_sessions.append(session);
-    m_sessionCombo->addItem(displayNameFor(session), session->id());
+    addSessionToCombo(session);
     return session;
+}
+
+void MainWindow::addSessionToCombo(DbSession *session)
+{
+    m_sessionCombo->addItem(displayNameFor(session), session->id());
+    const int index = m_sessionCombo->count() - 1;
+    if (!session->remoteTarget().isEmpty()) {
+        // Rack glyph marks Quack connections; drawn from theme colors, so
+        // refreshThemeDependentUi() re-sets it on theme switches.
+        m_sessionCombo->setItemIcon(index, Theme::Icons::actionIcon(Theme::Icons::Icon::Remote));
+    }
+}
+
+QString MainWindow::comboTextFor(DbSession *session) const
+{
+    QString text = displayNameFor(session);
+    if (m_disconnectedSessions.contains(session->id()))
+        text = tr("%1 (disconnected)").arg(text);
+    return text;
+}
+
+void MainWindow::markDisconnected(DbSession *session)
+{
+    m_disconnectedSessions.insert(session->id());
+    const int index = m_sessionCombo->findData(session->id());
+    if (index >= 0)
+        m_sessionCombo->setItemText(index, comboTextFor(session));
+    setStatusError(tr("Connection to %1 lost. Reconnect from the File menu to try again.")
+                       .arg(displayNameFor(session)));
+#ifdef DUCQ_QUACK
+    updateQuackReconnectAction();
+#endif
+}
+
+void MainWindow::clearDisconnected(DbSession *session)
+{
+    if (!m_disconnectedSessions.remove(session->id()))
+        return;
+    const int index = m_sessionCombo->findData(session->id());
+    if (index >= 0)
+        m_sessionCombo->setItemText(index, comboTextFor(session));
 }
 
 void MainWindow::activateSession(DbSession *session)
@@ -633,6 +734,9 @@ void MainWindow::activateSession(DbSession *session)
     if (index >= 0)
         m_sessionCombo->setCurrentIndex(index);
     updateConnectionLabel();
+#ifdef DUCQ_QUACK
+    updateQuackReconnectAction();
+#endif
     refreshCatalog();
 }
 
@@ -656,7 +760,16 @@ DbSession *MainWindow::sessionById(int sessionId) const
 
 bool MainWindow::ensureSessionIdle(DbSession *session)
 {
-    if (!session || !session->isBusy())
+    if (!session)
+        return false;
+    if (session->isBootstrapping()) {
+        // The worker is busy with an ATTACH; a blocking admin statement or
+        // close would queue behind it and stall the UI thread.
+        QMessageBox::information(this, QStringLiteral("DucQ"),
+                                 tr("A connection attempt is in progress. Wait for it to finish first."));
+        return false;
+    }
+    if (!session->isBusy())
         return true;
     QMessageBox::information(this, QStringLiteral("DucQ"),
                              tr("A query is running. Wait for it to finish or cancel it first."));
@@ -735,10 +848,57 @@ void MainWindow::connectQuackServer()
 {
     QuackConnectDialog dialog(this);
     dialog.setRecentTargets(quackRecentTargets());
-    if (dialog.exec() != QDialog::Accepted)
+    m_connectDialog = &dialog;
+    connect(&dialog, &QuackConnectDialog::connectRequested, this, &MainWindow::beginQuackConnect);
+    // The dialog stays open while an attempt is in flight and only closes on
+    // its outcome (accept on success, editable again on failure). Closing it
+    // by hand mid-flight cancels: abandonPendingConnect() marks the session
+    // so its completion discards it instead of revealing it.
+    dialog.exec();
+    abandonPendingConnect();
+}
+
+void MainWindow::abandonPendingConnect()
+{
+    if (!m_pendingConnectSession)
         return;
-    const QString server = dialog.server();
-    const QString token = dialog.token();
+    DbSession *session = m_pendingConnectSession;
+    m_pendingConnectSession = nullptr;
+    m_abandonedConnects.insert(session);
+    // Best-effort interrupt: a query-phase ATTACH may stop early; one blocked
+    // in the TCP connect ignores it and just runs out its timeout.
+    session->cancel();
+    // Outlive the window: during app shutdown the session's destructor would
+    // block on its worker thread, which is still parked on the ATTACH.
+    session->setParent(nullptr);
+    // Deleted by the completion handler once the bootstrap settles; deleting
+    // here would block on that very thread.
+}
+
+QString MainWindow::friendlyConnectError(const QString &server, const QString &raw) const
+{
+    const QString lower = raw.toLower();
+    QString headline;
+    if (lower.contains(u"connection refused"))
+        headline = tr("%1 refused the connection. Is a Quack server running there?").arg(server);
+    else if (lower.contains(u"timed out") || lower.contains(u"timeout"))
+        headline = tr("Connecting to %1 timed out. Check the address and any firewall in between.").arg(server);
+    else if (lower.contains(u"unreachable") || lower.contains(u"could not resolve")
+             || lower.contains(u"nodename nor servname"))
+        headline = tr("%1 could not be resolved or reached. Check the address.").arg(server);
+    else if (lower.contains(u"token") || lower.contains(u"unauthorized") || lower.contains(u"401")
+             || lower.contains(u"403"))
+        headline = tr("The server at %1 rejected the token.").arg(server);
+    else if (lower.contains(u"ssl") || lower.contains(u"certificate") || lower.contains(u"tls"))
+        headline = tr("Secure connection to %1 failed (SSL/certificate).").arg(server);
+    if (headline.isEmpty())
+        return raw;
+    // Both: one line that says what to do, the engine text for the details.
+    return headline + QLatin1String("\n\n") + raw;
+}
+
+void MainWindow::beginQuackConnect(const QString &server, const QString &token, const QString &alias)
+{
     const QString target = QStringLiteral("quack:") + server;
     // Reuse an existing connection to the same server instead of attaching it
     // a second time (ATTACH of the same quack database twice is refused).
@@ -746,6 +906,8 @@ void MainWindow::connectQuackServer()
         if (session->remoteTarget() == target) {
             activateSession(session);
             setStatusMessage(tr("Already connected: %1").arg(session->displayName()));
+            if (m_connectDialog)
+                m_connectDialog->accept();
             return;
         }
     }
@@ -754,27 +916,64 @@ void MainWindow::connectQuackServer()
     // (e.g. FROM remote.main.t) with filtering pushed down to the server.
     // (DuckDB 2.0's CONNECT would route whole sessions, but it conflicts with
     // the prepared-statement API the query layer is built on.)
-    QString bootstrap = QStringLiteral("ATTACH '%1' AS %2").arg(target, dialog.alias());
+    QString bootstrap = QStringLiteral("ATTACH '%1' AS %2").arg(target, alias);
     if (!token.isEmpty())
         bootstrap += QStringLiteral(" (TOKEN '%1')").arg(QString(token).replace(u'\'', QStringLiteral("''")));
     bootstrap += QLatin1Char(';');
 
-    DbSession *session = createSession(QString(), bootstrap, server, target);
-    if (!session)
+    // The ATTACH is a network operation: it runs queued on the session's
+    // worker instead of blocking the UI thread here, and the dialog shows a
+    // connecting state until the outcome arrives.
+    auto *session = new DbSession(m_nextSessionId++, this);
+    QString error;
+    if (!session->startOpen(QString(), bootstrap, server, target, &error)) {
+        // Local engine failed (no network involved): report inline and let
+        // the user correct the input.
+        delete session;
+        if (m_connectDialog)
+            m_connectDialog->showError(error);
         return;
-    activateSession(session);
-    rememberQuackTarget(server);
-    setStatusMessage(tr("Connected to %1").arg(server));
-}
-
-QString MainWindow::generateQuackToken() const
-{
-    // 128 random bits, hex encoded — well above the server's 4-character
-    // minimum and comfortable to copy by hand.
-    QString hex;
-    for (int i = 0; i < 4; ++i)
-        hex += QString::number(QRandomGenerator::system()->generate(), 16).rightJustified(8, u'0');
-    return hex;
+    }
+    connectSessionRunner(session);
+    m_pendingConnectSession = session;
+    const QPointer<QuackConnectDialog> dialog = m_connectDialog;
+    connect(session, &DbSession::bootstrapFinished, this,
+            [this, session, server, dialog](bool ok, const QString &attachError) {
+                if (m_pendingConnectSession == session)
+                    m_pendingConnectSession = nullptr;
+                if (m_abandonedConnects.contains(session)) {
+                    // Cancelled while in flight: discard, whatever the
+                    // outcome turned out to be.
+                    m_abandonedConnects.remove(session);
+                    session->deleteLater();
+                    setStatusMessage(tr("Cancelled connecting to %1").arg(server));
+                    return;
+                }
+                if (!ok) {
+                    const QString friendly = friendlyConnectError(server, attachError);
+                    session->deleteLater();
+                    if (dialog)
+                        dialog->showError(friendly);
+                    else
+                        setStatusError(friendly); // dialog gone: status bar
+                    return;
+                }
+                m_sessions.append(session);
+                addSessionToCombo(session);
+                rememberQuackTarget(server);
+                setStatusMessage(tr("Connected to %1").arg(server));
+                if (dialog) {
+                    // The dialog asked for this connection; activate it and
+                    // close. If the dialog was closed while the connect was
+                    // in flight, the session still appears in the selector,
+                    // just without yanking the active connection away.
+                    activateSession(session);
+                    dialog->accept();
+                }
+            });
+    if (dialog)
+        dialog->setConnecting(true);
+    setStatusMessage(tr("Connecting to %1…").arg(server));
 }
 
 void MainWindow::serveQuackDatabase()
@@ -820,6 +1019,51 @@ void MainWindow::serveQuackDatabase()
     dialog.exec();
 }
 
+void MainWindow::reconnectQuackServer()
+{
+    DbSession *session = m_activeSession;
+    if (!session || session->remoteTarget().isEmpty() || session->bootstrapSql().isEmpty())
+        return;
+    if (!ensureSessionIdle(session))
+        return;
+    const QString server = session->displayName();
+    setStatusMessage(tr("Reconnecting to %1…").arg(server));
+    // Exactly one bootstrapFinished handler per attempt: drop the wiring a
+    // previous attempt (e.g. the connect dialog) left on this session before
+    // adding ours, or a stale success path would run alongside it.
+    disconnect(session, &DbSession::bootstrapFinished, this, nullptr);
+    QString error;
+    if (!session->startOpen(QString(), session->bootstrapSql(), session->displayName(),
+                            session->remoteTarget(), &error)) {
+        // Local engine refused to re-open; the mark stays, the entry stays.
+        setStatusError(error);
+        return;
+    }
+    connectSessionRunner(session); // the re-open built a fresh runner
+    connect(session, &DbSession::bootstrapFinished, this,
+            [this, session, server](bool ok, const QString &attachError) {
+                if (ok) {
+                    clearDisconnected(session);
+                    setStatusMessage(tr("Reconnected to %1").arg(server));
+                    activateSession(session); // refreshes the catalog
+                } else {
+                    markDisconnected(session);
+                    setStatusError(friendlyConnectError(server, attachError));
+                }
+            });
+}
+
+void MainWindow::updateQuackReconnectAction()
+{
+    if (!m_quackReconnectAction)
+        return;
+    DbSession *session = m_activeSession;
+    const bool remote = session && !session->remoteTarget().isEmpty();
+    m_quackReconnectAction->setEnabled(remote);
+    m_quackReconnectAction->setText(remote ? tr("Reconnect to %1").arg(displayNameFor(session))
+                                           : tr("Reconnect to Server"));
+}
+
 #endif // DUCQ_QUACK
 
 void MainWindow::closeConnection()
@@ -827,10 +1071,21 @@ void MainWindow::closeConnection()
     DbSession *session = m_activeSession;
     if (!session || !ensureSessionIdle(session))
         return;
-    m_resultTabs->closeSessionTabs(session->id());
 #ifdef DUCQ_QUACK
-    // The session's database is going away; its quack_serve instances die
-    // with it, so forget them.
+    // The session's database is going away and its quack_serve instances die
+    // with it; make sure that is not a surprise for whoever is connected.
+    const bool serving = std::any_of(m_quackServers.cbegin(), m_quackServers.cend(),
+                                     [session](const QuackServerEntry &entry) {
+                                         return entry.sessionId == session->id();
+                                     });
+    if (serving) {
+        const QMessageBox::StandardButton answer = QMessageBox::question(
+            this, tr("Close Connection"),
+            tr("A Quack server is running on this connection. Closing it will disconnect its clients. "
+               "Close anyway?"));
+        if (answer != QMessageBox::Yes)
+            return;
+    }
     m_quackServers.removeIf([session](const QuackServerEntry &entry) {
         return entry.sessionId == session->id();
     });
@@ -838,6 +1093,7 @@ void MainWindow::closeConnection()
     const int index = m_sessionCombo->findData(session->id());
     if (index >= 0)
         m_sessionCombo->removeItem(index);
+    m_disconnectedSessions.remove(session->id());
     m_sessions.removeOne(session);
     session->deleteLater();
     m_activeSession = nullptr;
@@ -914,6 +1170,12 @@ void MainWindow::runOnSession(DbSession *session, const QString &sql, const QStr
 {
     if (!session)
         return;
+    if (!session->isOpen()) {
+        // A marked-lost session keeps its selector entry for reconnecting;
+        // queries against it would silently vanish (no runner to run them).
+        setStatusError(tr("The connection is not open. Reconnect it from the File menu first."));
+        return;
+    }
     const quint64 queryId = m_nextQueryId++;
     if (!followUpSql.isEmpty())
         m_followUps.insert(queryId, followUpSql);
@@ -986,6 +1248,13 @@ void MainWindow::onQueryFinished(int sessionId, quint64 queryId, qint64 elapsedM
         return;
     }
     if (!error.isEmpty()) {
+#ifdef DUCQ_QUACK
+        if (DbSession *session = sessionById(sessionId);
+            session && !session->remoteTarget().isEmpty() && looksLikeConnectionError(error)) {
+            markDisconnected(session); // also raises the actionable status
+            return;
+        }
+#endif
         setStatusError(error);
         return;
     }
@@ -996,6 +1265,8 @@ void MainWindow::onQueryFinished(int sessionId, quint64 queryId, qint64 elapsedM
     }
     setStatusMessage(tr("Done: %L1 rows · %L2 ms").arg(totalRows).arg(elapsedMs));
     if (DbSession *session = sessionById(sessionId)) {
+        // A success proves the connection is alive again (or never was bad).
+        clearDisconnected(session);
         if (!followUp.isEmpty()) {
             runOnSession(session, followUp);
             return;

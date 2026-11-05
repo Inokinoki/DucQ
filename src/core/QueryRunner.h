@@ -43,8 +43,15 @@ public slots:
     void bootstrap(const QString &sql);
     bool bootstrapOk() const { return m_bootstrapOk; }
     QString bootstrapError() const { return m_bootstrapError; }
+    // Same as bootstrap(), but reports via bootstrapDone instead of relying
+    // on the caller to block: the queued-connection path for remote sessions,
+    // whose ATTACH is a network operation and must not stall the UI thread.
+    void bootstrapAsync(const QString &sql);
 
 signals:
+    // Emitted at the end of bootstrapAsync(); ok and the error text mirror
+    // bootstrapOk()/bootstrapError().
+    void bootstrapDone(bool ok, const QString &error);
     // resultPtr points to a heap duckdb_result; the receiver takes ownership.
     void resultReady(quint64 queryId, quintptr resultPtr, const QVector<ducq::ColumnMeta> &columns);
     void finished(quint64 queryId, qint64 elapsedMs, qsizetype totalRows, bool cancelled, const QString &error);

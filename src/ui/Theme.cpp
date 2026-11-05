@@ -261,6 +261,17 @@ QPixmap drawIcon(Icon which, int size, const QColor &color)
             p.drawLine(QPointF(12.5, 3.5), QPointF(3.5, 12.5));
             break;
         }
+        case Icon::Remote: {
+            // A little server rack: two stacked units with status LEDs.
+            p.setPen(glyphPen(color));
+            p.drawRoundedRect(QRectF(2.5, 3.5, 11, 4), 1.2, 1.2);
+            p.drawRoundedRect(QRectF(2.5, 8.5, 11, 4), 1.2, 1.2);
+            p.setPen(Qt::NoPen);
+            p.setBrush(color);
+            for (const QPointF &led : { QPointF(4.6, 5.5), QPointF(4.6, 10.5) })
+                p.drawEllipse(led, 0.8, 0.8);
+            break;
+        }
         case Icon::Duck:
             break;
         }

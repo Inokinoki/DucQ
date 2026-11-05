@@ -2,6 +2,8 @@
 
 #include <QHash>
 #include <QMainWindow>
+#include <QPointer>
+#include <QSet>
 #include <QStringList>
 
 #include "core/Catalog.h"
@@ -33,6 +35,9 @@ class QueryRunner;
 class ResultTabs;
 class SchemaTree;
 class SqlEditor;
+#ifdef DUCQ_QUACK
+class QuackConnectDialog;
+#endif
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -60,7 +65,20 @@ private slots:
     void newInMemoryConnection();
 #ifdef DUCQ_QUACK
     void connectQuackServer();
+    // Starts the async ATTACH for one connectRequested() from the dialog.
+    void beginQuackConnect(const QString &server, const QString &token, const QString &alias);
+    // Discards a connect that is still in flight (dialog closed or app
+    // quitting): the session never joins the selector and is deleted once
+    // its bootstrap settles.
+    void abandonPendingConnect();
     void serveQuackDatabase();
+    // Re-opens the active session's worker with its original ATTACH after
+    // the server was marked lost.
+    void reconnectQuackServer();
+    // Raw ATTACH failure -> one actionable line + the original text.
+    QString friendlyConnectError(const QString &server, const QString &raw) const;
+    // File-menu item for the active session; enabled iff it is remote.
+    void updateQuackReconnectAction();
 #endif
     void closeConnection();
     void switchSession(int sessionId);
@@ -91,6 +109,17 @@ private:
 
     DbSession *createSession(const QString &path, const QString &bootstrapSql = {},
                              const QString &displayName = {}, const QString &remoteTarget = {});
+    // Wires a session's worker signals to the UI slots; the runner only
+    // exists once the session is open.
+    void connectSessionRunner(ducq::DbSession *session);
+    // Adds the session to the connection selector, with a rack icon when it
+    // is a remote (Quack) connection.
+    void addSessionToCombo(ducq::DbSession *session);
+    // The selector's text for a session: display name, plus a disconnected
+    // marker when the last remote exchange suggested the server is gone.
+    QString comboTextFor(ducq::DbSession *session) const;
+    void markDisconnected(ducq::DbSession *session);
+    void clearDisconnected(ducq::DbSession *session);
     void activateSession(ducq::DbSession *session);
     void closeActiveConnection();
     DbSession *sessionById(int sessionId) const;
@@ -115,7 +144,6 @@ private:
 #ifdef DUCQ_QUACK
     QStringList quackRecentTargets() const;
     void rememberQuackTarget(const QString &server);
-    QString generateQuackToken() const;
 #endif
     void setStatusMessage(const QString &message);
     void setStatusError(const QString &message);
@@ -154,6 +182,7 @@ private:
 #ifdef DUCQ_QUACK
     QAction *m_quackConnectAction = nullptr;
     QAction *m_quackServeAction = nullptr;
+    QAction *m_quackReconnectAction = nullptr;
 #endif
     QAction *m_closeConnectionAction = nullptr;
     QAction *m_exportCsvAction = nullptr;
@@ -168,6 +197,9 @@ private:
 
     QList<ducq::DbSession *> m_sessions;
     ducq::DbSession *m_activeSession = nullptr;
+    // Sessions whose last remote exchange looked like a connection loss.
+    // A successful query clears the mark (the server may have come back).
+    QSet<int> m_disconnectedSessions;
     int m_nextSessionId = 1;
     quint64 m_nextQueryId = 1; // globally unique across sessions
     int m_busyCount = 0;
@@ -181,6 +213,14 @@ private:
     bool m_persistState = true; // off for headless screenshots
     bool m_statusIsError = false; // re-colored on theme switches
 #ifdef DUCQ_QUACK
+    // The connect dialog while it is open; null (via QPointer) once the user
+    // closes it, even when an ATTACH attempt it started is still in flight.
+    QPointer<QuackConnectDialog> m_connectDialog;
+    // The session whose ATTACH the open dialog is waiting on.
+    DbSession *m_pendingConnectSession = nullptr;
+    // Cancelled connects that have not settled yet; kept so their completion
+    // handler can discard the session instead of revealing it.
+    QSet<DbSession *> m_abandonedConnects;
     // Servers started from this window, per session; the underlying
     // quack_serve instance dies with its session's database.
     QList<ducq::QuackServerEntry> m_quackServers;

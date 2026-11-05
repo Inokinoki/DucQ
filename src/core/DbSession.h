@@ -34,6 +34,21 @@ public:
     // created for, so the UI can dedupe reconnects.
     bool open(const QString &path, const QString &bootstrapSql, const QString &displayName,
               const QString &remoteTarget, QString *errorMessage);
+    // Asynchronous variant for remote sessions: the engine opens as in open()
+    // (fast, local), but the bootstrap SQL — typically a network ATTACH — is
+    // queued on the worker thread instead of blocking the caller. Reports via
+    // bootstrapFinished(); the session is only usable once that signal says
+    // ok. Failure leaves the session closed (safe to delete).
+    bool startOpen(const QString &path, const QString &bootstrapSql, const QString &displayName,
+                   const QString &remoteTarget, QString *errorMessage);
+    // The SQL the session was opened with (for remote sessions the ATTACH,
+    // token included). Lives in memory only, like the token itself; the UI
+    // reuses it to re-open the session when the server comes back.
+    const QString &bootstrapSql() const { return m_bootstrapSql; }
+    // True while startOpen()'s bootstrap is queued or running on the worker:
+    // closing or re-opening the session in that window would block the UI
+    // thread behind the in-flight ATTACH.
+    bool isBootstrapping() const { return m_bootstrapping; }
     // Stops the worker and closes the database. Safe to call repeatedly.
     void close();
     // Runs a statement synchronously on the worker connection and reports
@@ -49,10 +64,17 @@ public:
     const QString &displayName() const { return m_displayName; }
     const QString &remoteTarget() const { return m_remoteTarget; }
 
+signals:
+    // Outcome of startOpen()'s bootstrap; mirrors QueryRunner::bootstrapDone.
+    void bootstrapFinished(bool ok, const QString &error);
+
 public slots:
     void runSql(quint64 queryId, const QString &sql);
     void refreshCatalog();
     void cancel();
+
+private slots:
+    void onBootstrapDone(bool ok, const QString &error);
 
 private:
     int m_id;
@@ -62,6 +84,8 @@ private:
     int m_pending = 0;
     QString m_displayName;
     QString m_remoteTarget;
+    QString m_bootstrapSql;
+    bool m_bootstrapping = false;
 };
 
 } // namespace ducq
