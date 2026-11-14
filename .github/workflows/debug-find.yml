@@ -1,0 +1,40 @@
+name: debug-find
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev ninja-build
+
+      - name: Script-mode probe
+        run: |
+          cat > /tmp/probe.cmake <<'EOF'
+          find_package(CURL QUIET)
+          message("PROBE CURL_FOUND=${CURL_FOUND}")
+          find_package(roaring QUIET CONFIG)
+          message("PROBE roaring_FOUND=${roaring_FOUND}")
+          EOF
+          cmake -P /tmp/probe.cmake
+
+      - name: Configure and report
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo > configure.log 2>&1 || true
+          grep -E "DucQ:|Load extension 'httpfs'|Load extension 'iceberg'|CMake Error|Could NOT find" configure.log | head -30
+          echo "=== cache state ==="
+          grep -E "^CURL_(LIBRARY|INCLUDE_DIR|FOUND)" build/CMakeCache.txt | head -5 || echo "no CURL cache entries"
+          grep -E "BUILD_EXTENSIONS:" build/CMakeCache.txt || echo "no BUILD_EXTENSIONS cache entry"
+
+      - name: Upload configure log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: configure-log
+          path: configure.log
+          retention-days: 3
