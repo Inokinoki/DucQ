@@ -357,6 +357,40 @@ if(NOT DUCQ_RUSTC_RESULT STREQUAL "0")
 endif()
 unset(DUCQ_RUSTC_VERSION)
 
+# delta's Linux cargo build hardcodes vcpkg's OpenSSL layout: it exports
+# OPENSSL_STATIC=1 with OPENSSL_LIB_DIR/OPENSSL_INCLUDE_DIR under
+# ${CMAKE_BINARY_DIR}/vcpkg_installed/<triplet> — and outside vcpkg the
+# triplet is empty, so openssl-sys panics on the missing directory. Instead
+# of patching the fetched extension, materialize the directory it expects
+# from the system's static OpenSSL (same trick as the mysql include copy):
+# libssl-dev ships libssl.a/libcrypto.a and the headers. Without them, skip
+# delta like the other probed dependencies.
+if(UNIX AND NOT APPLE)
+    file(GLOB DUCQ_SSL_STATIC_LIB
+        /usr/lib/*/libssl.a /usr/lib/libssl.a /usr/lib64/libssl.a
+        /usr/local/lib/libssl.a)
+    file(GLOB DUCQ_CRYPTO_STATIC_LIB
+        /usr/lib/*/libcrypto.a /usr/lib/libcrypto.a /usr/lib64/libcrypto.a
+        /usr/local/lib/libcrypto.a)
+    find_path(DUCQ_OPENSSL_INCLUDE_DIR openssl/ssl.h
+        PATHS /usr/include /usr/local/include)
+    if(DUCQ_SSL_STATIC_LIB AND DUCQ_CRYPTO_STATIC_LIB AND DUCQ_OPENSSL_INCLUDE_DIR)
+        # One archive per name: a multiarch dev box could glob several.
+        list(GET DUCQ_SSL_STATIC_LIB 0 DUCQ_SSL_STATIC_LIB)
+        list(GET DUCQ_CRYPTO_STATIC_LIB 0 DUCQ_CRYPTO_STATIC_LIB)
+        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/vcpkg_installed/lib"
+                            "${CMAKE_BINARY_DIR}/vcpkg_installed/include")
+        file(COPY "${DUCQ_SSL_STATIC_LIB}" "${DUCQ_CRYPTO_STATIC_LIB}"
+             DESTINATION "${CMAKE_BINARY_DIR}/vcpkg_installed/lib")
+        file(COPY "${DUCQ_OPENSSL_INCLUDE_DIR}/openssl"
+             DESTINATION "${CMAKE_BINARY_DIR}/vcpkg_installed/include")
+        message(STATUS "DucQ: materialized vcpkg OpenSSL layout for delta (${DUCQ_SSL_STATIC_LIB})")
+    else()
+        message(STATUS "DucQ: static OpenSSL not found for delta's cargo build — building without delta (install libssl-dev)")
+        ducq_skip_extension(delta)
+    endif()
+endif()
+
 # httpfs resolves CURL through find_package at configure time (its vcpkg.json
 # names curl+openssl); slim images and CI runners sometimes lack the dev
 # headers, and a missing CURL must not fail the whole build. postgres_scanner
@@ -464,11 +498,18 @@ if(NOT DUCQ_DYNAMIC_EXTENSIONS)
 # The extension build links its loadable artifacts against a duckdb_static
 # target, which BUILD_EXTENSIONS_ONLY does not create. Alias it to the
 # prebuilt archive (same v2.0.0 tag, so the symbols all resolve); the archive
-# suffix is platform-dependent, so use the path the link loop resolved.
+# suffix is platform-dependent, so use the path the link loop resolved. The
+# prebuilt engine's file-lock diagnostics use the Restart Manager API, and
+# the loadable targets don't link rstrtmgr themselves (DucQ's executables
+# do, via duckdb_bundle below).
 if(NOT TARGET duckdb_static)
     add_library(duckdb_static STATIC IMPORTED GLOBAL)
     set_target_properties(duckdb_static PROPERTIES
         IMPORTED_LOCATION "${DUCKDB_STATIC_ARCHIVE}")
+    if(MSVC)
+        set_property(TARGET duckdb_static APPEND PROPERTY
+            INTERFACE_LINK_LIBRARIES Rstrtmgr.lib)
+    endif()
 endif()
 endif()
 FetchContent_MakeAvailable(duckdb_ext)
@@ -669,6 +710,13 @@ int32_t duckdb_extension_mysql_scanner_describe(duckdb_extension_descriptor *des
                 "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/*/release/libdelta_kernel_ffi.a")
             if(DELTA_RUST)
                 target_link_libraries(duckdb_bundle INTERFACE ${DELTA_RUST})
+                # delta's OpenSSL is linked statically (see the materialized
+                # vcpkg layout above); a static libcrypto.a can pull in zlib
+                # symbols that nothing else in the bundle provides.
+                find_package(ZLIB QUIET)
+                if(TARGET ZLIB::ZLIB)
+                    target_link_libraries(duckdb_bundle INTERFACE ZLIB::ZLIB)
+                endif()
             endif()
         endif()
         continue()
