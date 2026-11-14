@@ -394,6 +394,13 @@ if(NOT roaring_FOUND)
     ducq_skip_extension(ducklake)
 endif()
 
+# Export what survived the probes to the tests: testQuackRegistered asserts
+# httpfs's registration only when the build actually ships it (runners
+# without a findable CURL legitimately build without it).
+if("httpfs" IN_LIST DUCKDB_OOTE_SOURCES)
+    add_compile_definitions(DUCQ_HTTPFS=1)
+endif()
+
 FetchContent_Declare(duckdb_ext
     GIT_REPOSITORY "https://github.com/duckdb/duckdb.git"
     GIT_TAG "v2.0.0"
