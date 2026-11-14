@@ -881,30 +881,30 @@ add_test(NAME test_core COMMAND test_core)
 
 if(DUCQ_DYNAMIC_EXTENSIONS)
     # Install the out-of-tree loadables next to the executable, where
-    # core/ExtensionLoader finds and LOADs them at startup.
+    # core/ExtensionLoader finds and LOADs them at startup. Only the built
+    # artifacts are copied (scripts/collect_loadables.cmake): the whole
+    # extension tree holds intermediates that are still being written while
+    # the copy runs, and a whole-tree copy raced the last links (ENOENT).
     add_custom_target(ducq_collect_loadables ALL
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-                "$<TARGET_FILE_DIR:DucQ>/extensions"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-                "${duckdb_ext_BINARY_DIR}/extension"
-                "$<TARGET_FILE_DIR:DucQ>/extensions"
+        COMMAND ${CMAKE_COMMAND} -DCOLLECT_SRC="${duckdb_ext_BINARY_DIR}/extension"
+                -DCOLLECT_DST="$<TARGET_FILE_DIR:DucQ>/extensions"
+                -P "${CMAKE_CURRENT_LIST_DIR}/scripts/collect_loadables.cmake"
         COMMENT "Collecting *.duckdb_extension loadables"
         DEPENDS DucQ)
     # Same for the test binary, so extension-dependent tests (the quack
     # loopback) exercise the real load path there instead of skipping.
     add_custom_target(ducq_collect_loadables_test ALL
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-                "$<TARGET_FILE_DIR:test_core>/extensions"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-                "${duckdb_ext_BINARY_DIR}/extension"
-                "$<TARGET_FILE_DIR:test_core>/extensions"
+        COMMAND ${CMAKE_COMMAND} -DCOLLECT_SRC="${duckdb_ext_BINARY_DIR}/extension"
+                -DCOLLECT_DST="$<TARGET_FILE_DIR:test_core>/extensions"
+                -P "${CMAKE_CURRENT_LIST_DIR}/scripts/collect_loadables.cmake"
         COMMENT "Collecting *.duckdb_extension loadables for tests"
         DEPENDS test_core)
-    # The copies must wait for the loadables themselves: depending only on
-    # the executables let the copy run while extensions were still building,
-    # and a half-populated directory silently degraded the LOAD path (no
-    # httpfs => quack_serve fails on the missing crypto module).
-    foreach(_ext IN LISTS DUCKDB_EXT_SOURCES)
+    # The copies must wait for every loadable — the out-of-tree ones and the
+    # in-tree ones DuckDB's dynamic build also produces as loadables:
+    # depending only on the executables let the copy run while extensions
+    # were still building, and a half-populated directory silently degraded
+    # the LOAD path (no httpfs => quack_serve fails on the missing crypto).
+    foreach(_ext IN LISTS DUCKDB_EXT_SOURCES core_functions parquet json icu)
         if(TARGET ${_ext}_loadable_extension)
             add_dependencies(ducq_collect_loadables ${_ext}_loadable_extension)
             add_dependencies(ducq_collect_loadables_test ${_ext}_loadable_extension)
