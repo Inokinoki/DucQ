@@ -76,7 +76,18 @@ jobs:
         run: cmake --build build --parallel
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure --timeout 300
+        shell: bash
+        run: |
+          if ctest --test-dir build --output-on-failure --timeout 300; then
+            exit 0
+          fi
+          # A crashing Windows test loses its pipe-buffered stdout; re-run
+          # with QtTest's file logger, which keeps completed test results.
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            (cd build && ./test_core.exe -o test-out.txt,txt || true)
+            cat build/test-out.txt || true
+          fi
+          exit 1
 
       # Launch the real app, run the demo script and grab the window from
       # inside the process. Linux has no display server, so it uses the

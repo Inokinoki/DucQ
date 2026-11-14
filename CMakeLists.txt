@@ -893,6 +893,16 @@ if(DUCQ_DYNAMIC_EXTENSIONS)
                 "$<TARGET_FILE_DIR:test_core>/extensions"
         COMMENT "Collecting *.duckdb_extension loadables for tests"
         DEPENDS test_core)
+    # The copies must wait for the loadables themselves: depending only on
+    # the executables let the copy run while extensions were still building,
+    # and a half-populated directory silently degraded the LOAD path (no
+    # httpfs => quack_serve fails on the missing crypto module).
+    foreach(_ext IN LISTS DUCKDB_EXT_SOURCES)
+        if(TARGET ${_ext}_loadable_extension)
+            add_dependencies(ducq_collect_loadables ${_ext}_loadable_extension)
+            add_dependencies(ducq_collect_loadables_test ${_ext}_loadable_extension)
+        endif()
+    endforeach()
 endif()
 
 if(TARGET mysql_scanner_pack)
