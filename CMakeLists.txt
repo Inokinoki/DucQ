@@ -478,15 +478,22 @@ if(NOT DUCQ_DYNAMIC_EXTENSIONS)
 # The extension build links its loadable artifacts against a duckdb_static
 # target, which BUILD_EXTENSIONS_ONLY does not create. Alias it to the
 # prebuilt archive (same v2.0.0 tag, so the symbols all resolve); the archive
-# suffix is platform-dependent, so use the path the link loop resolved. The
-# prebuilt engine's file-lock diagnostics use the Restart Manager API, and
-# the loadable targets don't link rstrtmgr themselves (DucQ's executables
-# do, via duckdb_bundle below).
+# suffix is platform-dependent, so use the path the link loop resolved.
+# The loadables also link their source-built third-party archives, and the
+# prebuilt engine embeds the same libraries as one LTO lump: BFD ld reports
+# multiple definitions, so let the first definition win on ELF toolchains —
+# the loadables are never loaded by the static binary anyway (dynamic
+# loading is compiled out). MSVC resolves archive duplicates on demand and
+# instead cannot link a DLL with unresolved engine symbols; it needs the
+# archive for the API plus Restart Manager for the file-lock diagnostics.
 if(NOT TARGET duckdb_static)
     add_library(duckdb_static STATIC IMPORTED GLOBAL)
     set_target_properties(duckdb_static PROPERTIES
         IMPORTED_LOCATION "${DUCKDB_STATIC_ARCHIVE}")
-    if(MSVC)
+    if(UNIX AND NOT APPLE)
+        set_property(TARGET duckdb_static APPEND PROPERTY
+            INTERFACE_LINK_LIBRARIES "-Wl,--allow-multiple-definition")
+    elseif(MSVC)
         set_property(TARGET duckdb_static APPEND PROPERTY
             INTERFACE_LINK_LIBRARIES Rstrtmgr.lib)
     endif()
