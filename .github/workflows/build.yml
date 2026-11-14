@@ -53,7 +53,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev ninja-build libssl-dev zlib1g-dev libzstd-dev
+          sudo apt-get install -y qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev ninja-build libssl-dev
 
       - name: Install Qt (macOS/Windows)
         if: runner.os != 'Linux'
