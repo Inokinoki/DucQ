@@ -341,6 +341,26 @@ if(NOT DUCQ_RUSTC_RESULT STREQUAL "0")
     ducq_skip_extension(delta)
 endif()
 unset(DUCQ_RUSTC_VERSION)
+
+# httpfs resolves CURL through find_package at configure time (its vcpkg.json
+# names curl+openssl); slim images and CI runners sometimes lack the dev
+# headers, and a missing CURL must not fail the whole build.
+find_package(CURL QUIET)
+if(NOT CURL_FOUND)
+    message(STATUS "DucQ: CURL not found — building without httpfs (S3/URL reads; install libcurl4-openssl-dev)")
+    ducq_skip_extension(httpfs)
+endif()
+
+# iceberg and ducklake hard-require CRoaring (find_package(roaring CONFIG
+# REQUIRED) in their own CMakeLists); nothing universally provides the
+# expected roaringConfig.cmake, so drop both gracefully when it is absent.
+find_package(roaring QUIET CONFIG)
+if(NOT roaring_FOUND)
+    message(STATUS "DucQ: roaring not found — building without iceberg/ducklake (vcpkg install roaring)")
+    ducq_skip_extension(iceberg)
+    ducq_skip_extension(ducklake)
+endif()
+
 FetchContent_Declare(duckdb_ext
     GIT_REPOSITORY "https://github.com/duckdb/duckdb.git"
     GIT_TAG "v2.0.0"
