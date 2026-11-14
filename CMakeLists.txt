@@ -363,8 +363,11 @@ unset(DUCQ_RUSTC_VERSION)
 # triplet is empty, so openssl-sys panics on the missing directory. Instead
 # of patching the fetched extension, materialize the directory it expects
 # from the system's static OpenSSL (same trick as the mysql include copy):
-# libssl-dev ships libssl.a/libcrypto.a and the headers. Without them, skip
-# delta like the other probed dependencies.
+# libssl-dev ships libssl.a/libcrypto.a and the headers. Distro libcrypto.a
+# references zlib and zstd symbols (both are built in), which rust-lld must
+# resolve while linking cargo's own artifacts, so the archive is merged with
+# libz.a/libzstd.a into a self-contained libcrypto.a (binutils ar MRI mode).
+# Without any of the pieces, skip delta like the other probed dependencies.
 if(UNIX AND NOT APPLE)
     file(GLOB DUCQ_SSL_STATIC_LIB
         /usr/lib/*/libssl.a /usr/lib/libssl.a /usr/lib64/libssl.a
@@ -372,21 +375,48 @@ if(UNIX AND NOT APPLE)
     file(GLOB DUCQ_CRYPTO_STATIC_LIB
         /usr/lib/*/libcrypto.a /usr/lib/libcrypto.a /usr/lib64/libcrypto.a
         /usr/local/lib/libcrypto.a)
+    file(GLOB DUCQ_Z_STATIC_LIB
+        /usr/lib/*/libz.a /usr/lib/libz.a /usr/lib64/libz.a
+        /usr/local/lib/libz.a)
+    file(GLOB DUCQ_ZSTD_STATIC_LIB
+        /usr/lib/*/libzstd.a /usr/lib/libzstd.a /usr/lib64/libzstd.a
+        /usr/local/lib/libzstd.a)
     find_path(DUCQ_OPENSSL_INCLUDE_DIR openssl/ssl.h
         PATHS /usr/include /usr/local/include)
-    if(DUCQ_SSL_STATIC_LIB AND DUCQ_CRYPTO_STATIC_LIB AND DUCQ_OPENSSL_INCLUDE_DIR)
+    if(DUCQ_SSL_STATIC_LIB AND DUCQ_CRYPTO_STATIC_LIB AND DUCQ_Z_STATIC_LIB
+       AND DUCQ_ZSTD_STATIC_LIB AND DUCQ_OPENSSL_INCLUDE_DIR)
         # One archive per name: a multiarch dev box could glob several.
         list(GET DUCQ_SSL_STATIC_LIB 0 DUCQ_SSL_STATIC_LIB)
         list(GET DUCQ_CRYPTO_STATIC_LIB 0 DUCQ_CRYPTO_STATIC_LIB)
+        list(GET DUCQ_Z_STATIC_LIB 0 DUCQ_Z_STATIC_LIB)
+        list(GET DUCQ_ZSTD_STATIC_LIB 0 DUCQ_ZSTD_STATIC_LIB)
         file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/vcpkg_installed/lib"
                             "${CMAKE_BINARY_DIR}/vcpkg_installed/include")
-        file(COPY "${DUCQ_SSL_STATIC_LIB}" "${DUCQ_CRYPTO_STATIC_LIB}"
-             DESTINATION "${CMAKE_BINARY_DIR}/vcpkg_installed/lib")
-        file(COPY "${DUCQ_OPENSSL_INCLUDE_DIR}/openssl"
-             DESTINATION "${CMAKE_BINARY_DIR}/vcpkg_installed/include")
-        message(STATUS "DucQ: materialized vcpkg OpenSSL layout for delta (${DUCQ_SSL_STATIC_LIB})")
+        file(WRITE "${CMAKE_BINARY_DIR}/vcpkg_installed/merge.mri"
+"create libcrypto.a
+addlib ${DUCQ_CRYPTO_STATIC_LIB}
+addlib ${DUCQ_Z_STATIC_LIB}
+addlib ${DUCQ_ZSTD_STATIC_LIB}
+save
+end
+")
+        execute_process(COMMAND ar -M
+            INPUT_FILE "${CMAKE_BINARY_DIR}/vcpkg_installed/merge.mri"
+            WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/vcpkg_installed/lib"
+            RESULT_VARIABLE DUCQ_AR_RESULT)
+        if(NOT DUCQ_AR_RESULT STREQUAL "0")
+            message(STATUS "DucQ: merging libcrypto.a failed — building without delta")
+            ducq_skip_extension(delta)
+        else()
+            file(COPY "${DUCQ_SSL_STATIC_LIB}"
+                 DESTINATION "${CMAKE_BINARY_DIR}/vcpkg_installed/lib")
+            file(REMOVE "${CMAKE_BINARY_DIR}/vcpkg_installed/merge.mri")
+            file(COPY "${DUCQ_OPENSSL_INCLUDE_DIR}/openssl"
+                 DESTINATION "${CMAKE_BINARY_DIR}/vcpkg_installed/include")
+            message(STATUS "DucQ: materialized vcpkg OpenSSL layout for delta (${DUCQ_SSL_STATIC_LIB})")
+        endif()
     else()
-        message(STATUS "DucQ: static OpenSSL not found for delta's cargo build — building without delta (install libssl-dev)")
+        message(STATUS "DucQ: static OpenSSL not found for delta's cargo build — building without delta (install libssl-dev zlib1g-dev libzstd-dev)")
         ducq_skip_extension(delta)
     endif()
 endif()
@@ -711,11 +741,16 @@ int32_t duckdb_extension_mysql_scanner_describe(duckdb_extension_descriptor *des
             if(DELTA_RUST)
                 target_link_libraries(duckdb_bundle INTERFACE ${DELTA_RUST})
                 # delta's OpenSSL is linked statically (see the materialized
-                # vcpkg layout above); a static libcrypto.a can pull in zlib
-                # symbols that nothing else in the bundle provides.
+                # vcpkg layout above) and lands embedded in the ffi archive;
+                # a distro libcrypto.a references zlib and zstd symbols the
+                # rest of the bundle does not provide.
                 find_package(ZLIB QUIET)
                 if(TARGET ZLIB::ZLIB)
                     target_link_libraries(duckdb_bundle INTERFACE ZLIB::ZLIB)
+                endif()
+                find_library(DUCQ_ZSTD_LIB zstd)
+                if(DUCQ_ZSTD_LIB)
+                    target_link_libraries(duckdb_bundle INTERFACE ${DUCQ_ZSTD_LIB})
                 endif()
             endif()
         endif()
