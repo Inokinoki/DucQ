@@ -13,28 +13,27 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev ninja-build
 
-      - name: Script-mode probe
+      - name: Configure with trace
         run: |
-          cat > /tmp/probe.cmake <<'EOF'
-          find_package(CURL QUIET)
-          message("PROBE CURL_FOUND=${CURL_FOUND}")
-          find_package(roaring QUIET CONFIG)
-          message("PROBE roaring_FOUND=${roaring_FOUND}")
-          EOF
-          cmake -P /tmp/probe.cmake
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            --trace-expand --trace-redirect=/tmp/trace.log > configure.log 2>&1 || true
 
-      - name: Configure and report
+      - name: Analyze trace
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo > configure.log 2>&1 || true
-          grep -E "DucQ:|Load extension 'httpfs'|Load extension 'iceberg'|CMake Error|Could NOT find" configure.log | head -30
-          echo "=== cache state ==="
-          grep -E "^CURL_(LIBRARY|INCLUDE_DIR|FOUND)" build/CMakeCache.txt | head -5 || echo "no CURL cache entries"
-          grep -E "BUILD_EXTENSIONS:" build/CMakeCache.txt || echo "no BUILD_EXTENSIONS cache entry"
+          echo "=== our CMakeLists lines 344-362 as executed ==="
+          grep -nE "CMakeLists.txt:(34[5-9]|35[0-9]|36[0-3])\(" /tmp/trace.log | head -30
+          echo "=== CURL_FOUND writes ==="
+          grep -nE "set\(CURL_FOUND" /tmp/trace.log | head -20
+          echo "=== find_package(CURL calls ==="
+          grep -nE "find_package\(CURL" /tmp/trace.log | head -20
+          echo "=== FindCURL early return / config branch ==="
+          grep -nE "FindCURL.cmake:(7[0-9]|8[0-9]|9[0-9]|1[0-9][0-9])\(" /tmp/trace.log | head -40
 
-      - name: Upload configure log
+      - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: configure-log
-          path: configure.log
+          name: debug-trace
+          path: |
+            configure.log
           retention-days: 3
