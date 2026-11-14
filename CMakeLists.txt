@@ -358,19 +358,17 @@ endif()
 unset(DUCQ_RUSTC_VERSION)
 
 # delta's Linux cargo build forces OPENSSL_STATIC with vcpkg's OpenSSL layout
-# (vcpkg_installed/<triplet>, an empty triplet outside vcpkg). Distro static
-# libcrypto.a also drags in a tail of private dependencies (zlib, zstd,
-# jitterentropy — the last one not even packaged on current Ubuntu) that make
-# a static link unworkable, so instead rely on the system's dynamic OpenSSL:
-# with the overrides patched out, openssl-sys finds libssl.so/libcrypto.so
-# from libssl-dev. Patch happens after the fetch below; see the block after
-# FetchContent_MakeAvailable. No OpenSSL at all: skip delta.
+# (vcpkg_installed/<triplet>, an empty triplet outside vcpkg), and the env
+# vars are baked into its ExternalProject command at configure time — too
+# early to patch the fetched extension from here. Feeding it a static
+# libcrypto.a doesn't work either: distro archives reference a tail of
+# private dependencies (zlib, zstd, jitterentropy — the last one not even
+# packaged on current Ubuntu). Until delta grows a non-vcpkg OpenSSL path
+# (e.g. openssl-sys's vendored feature), build it only where its defaults
+# work: macOS (system-discovered dynamic OpenSSL) and Windows.
 if(UNIX AND NOT APPLE)
-    find_package(OpenSSL QUIET)
-    if(NOT OPENSSL_FOUND)
-        message(STATUS "DucQ: OpenSSL not found — building without delta (install libssl-dev)")
-        ducq_skip_extension(delta)
-    endif()
+    message(STATUS "DucQ: delta needs vcpkg's OpenSSL layout on Linux — building without delta (see the delta probe comment)")
+    ducq_skip_extension(delta)
 endif()
 
 # httpfs resolves CURL through find_package at configure time (its vcpkg.json
@@ -512,31 +510,6 @@ if(DUCQ_QUACK AND EXISTS "${_quack_keygen}")
     unset(_quack_content)
 endif()
 unset(_quack_keygen)
-
-# delta's Linux cargo build exports OPENSSL_STATIC=1 with OPENSSL_LIB_DIR/
-# OPENSSL_INCLUDE_DIR pointing into vcpkg_installed/<triplet> — see the
-# probe comment above. Neutralize the three values (harmlessly renamed) so
-# openssl-sys discovers the system OpenSSL dynamically instead. delta is an
-# ExternalProject: its own CMakeLists runs at BUILD time in a child cmake,
-# so patching the fetched source here — after the fetch, before any build —
-# takes effect without a re-configure. Replace is idempotent.
-if(UNIX AND NOT APPLE)
-    set(_delta_cmake "${CMAKE_BINARY_DIR}/_deps/delta_extension_fc-src/CMakeLists.txt")
-    if(EXISTS "${_delta_cmake}")
-        file(READ "${_delta_cmake}" _delta_content)
-        string(REPLACE "OPENSSL_STATIC=1" "DUCQ_OPENSSL_DYNAMIC=1"
-                       _delta_content "${_delta_content}")
-        string(REPLACE "OPENSSL_LIB_DIR=\${CMAKE_BINARY_DIR}/vcpkg_installed/\${VCPKG_TARGET_TRIPLET}/lib"
-                       "DUCQ_OPENSSL_LIB_DIR_UNUSED=1"
-                       _delta_content "${_delta_content}")
-        string(REPLACE "OPENSSL_INCLUDE_DIR=\${CMAKE_BINARY_DIR}/vcpkg_installed/\${VCPKG_TARGET_TRIPLET}/include"
-                       "DUCQ_OPENSSL_INCLUDE_DIR_UNUSED=1"
-                       _delta_content "${_delta_content}")
-        file(WRITE "${_delta_cmake}" "${_delta_content}")
-        unset(_delta_content)
-    endif()
-    unset(_delta_cmake)
-endif()
 
 # ---------------------------------------------------------------------------
 # Generated static-extension loader (both build modes).
@@ -717,19 +690,6 @@ int32_t duckdb_extension_mysql_scanner_describe(duckdb_extension_descriptor *des
                 "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/*/release/libdelta_kernel_ffi.a")
             if(DELTA_RUST)
                 target_link_libraries(duckdb_bundle INTERFACE ${DELTA_RUST})
-                # On Linux delta's cargo links the system OpenSSL dynamically
-                # (see the fetched-CMakeLists patch); the ffi staticlib
-                # carries those references unresolved, so the executables
-                # need them at link time. macOS already links OpenSSL for
-                # httpfs, and Windows resolves through its own detection.
-                if(UNIX AND NOT APPLE)
-                    find_package(OpenSSL QUIET)
-                    if(OpenSSL_FOUND)
-                        target_link_libraries(duckdb_bundle INTERFACE OpenSSL::SSL OpenSSL::Crypto)
-                    else()
-                        target_link_libraries(duckdb_bundle INTERFACE ssl crypto)
-                    endif()
-                endif()
             endif()
         endif()
         continue()
