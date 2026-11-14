@@ -118,6 +118,11 @@ foreach(_name IN LISTS DUCKDB_LIB_NAMES)
     if(NOT _found)
         message(FATAL_ERROR "DuckDB static library not found in ${duckdb_libs_SOURCE_DIR}: ${_name}")
     endif()
+    if(_name STREQUAL "duckdb_static")
+        # Reused by the BUILD_EXTENSIONS_ONLY alias below; the platform suffix
+        # differs (.lib on Windows, .a elsewhere).
+        set(DUCKDB_STATIC_ARCHIVE "${_found}")
+    endif()
     list(APPEND DUCKDB_LINK_LIBS "${_found}")
 endforeach()
 
@@ -297,6 +302,7 @@ find_path(MARIADB_INCLUDE_DIR mysql.h
 find_library(MARIADB_LIBRARY mariadb
     HINTS /opt/homebrew/opt/mariadb-connector-c/lib /usr/lib /usr/local/lib)
 if(MARIADB_INCLUDE_DIR AND MARIADB_LIBRARY)
+    set(DUCQ_MYSQL_ENABLED ON)
     # mysql_catalog.cpp / mysql_schema_entry.cpp define un-namespaced free
     # helpers (GetSecret, CatalogTypeIsSupported) that postgres' copies of the
     # same code also define — fine for separate loadables, a collision when
@@ -327,7 +333,16 @@ endif()
     message(STATUS "DucQ: libmariadb found — enabling mysql_scanner (${MARIADB_LIBRARY})")
 else()
     message(STATUS "DucQ: libmariadb not found — building without mysql_scanner")
+    set(DUCQ_MYSQL_ENABLED OFF)
     ducq_skip_extension(mysql_scanner)
+endif()
+
+# core/StaticExtensions.cpp references mysql's describe entry point only when
+# the packed archive exists; without the definition the reference compiles
+# out instead of breaking the link on machines (and CI runners) without
+# libmariadb.
+if(DUCQ_MYSQL_ENABLED)
+    add_compile_definitions(DUCQ_STATIC_MYSQL=1)
 endif()
 
 # delta builds its Rust kernel via cargo; probe rustc like the other external
@@ -344,11 +359,15 @@ unset(DUCQ_RUSTC_VERSION)
 
 # httpfs resolves CURL through find_package at configure time (its vcpkg.json
 # names curl+openssl); slim images and CI runners sometimes lack the dev
-# headers, and a missing CURL must not fail the whole build.
+# headers, and a missing CURL must not fail the whole build. postgres_scanner
+# piggybacks on the same discovery: its loadable target links CURL_LIBRARIES
+# without searching, expecting httpfs's find_package to have populated it —
+# with httpfs skipped, nothing would, so drop postgres here too.
 find_package(CURL QUIET)
 if(NOT CURL_FOUND)
-    message(STATUS "DucQ: CURL not found — building without httpfs (S3/URL reads; install libcurl4-openssl-dev)")
+    message(STATUS "DucQ: CURL not found — building without httpfs/postgres_scanner (S3/URL reads, ATTACH Postgres; install libcurl4-openssl-dev)")
     ducq_skip_extension(httpfs)
+    ducq_skip_extension(postgres_scanner)
 endif()
 
 # iceberg and ducklake hard-require CRoaring (find_package(roaring CONFIG
@@ -387,7 +406,10 @@ if(DUCQ_DYNAMIC_EXTENSIONS)
     # loadable_extensions is DuckDB's pseudo-extension carrying the INSTALL/
     # LOAD machinery; registering it wires the dynamic provider per database.
     set(DUCQ_LOADER_EXTS loadable_extensions core_functions parquet json icu autocomplete tpch tpcds)
-    if(NOT MINGW)
+    # postgres only when it survived the dependency probes above — the loader
+    # stub declares a describe entry for every name here, and referencing a
+    # skipped extension's symbol breaks the link.
+    if(NOT MINGW AND "postgres_scanner" IN_LIST DUCKDB_EXT_SOURCES)
         list(INSERT DUCQ_LOADER_EXTS 4 postgres_scanner)
     endif()
     set(DUCQ_LOADER_INCLUDE_DIRS
@@ -441,11 +463,12 @@ endif()
 if(NOT DUCQ_DYNAMIC_EXTENSIONS)
 # The extension build links its loadable artifacts against a duckdb_static
 # target, which BUILD_EXTENSIONS_ONLY does not create. Alias it to the
-# prebuilt archive (same v2.0.0 tag, so the symbols all resolve).
+# prebuilt archive (same v2.0.0 tag, so the symbols all resolve); the archive
+# suffix is platform-dependent, so use the path the link loop resolved.
 if(NOT TARGET duckdb_static)
     add_library(duckdb_static STATIC IMPORTED GLOBAL)
     set_target_properties(duckdb_static PROPERTIES
-        IMPORTED_LOCATION "${duckdb_libs_SOURCE_DIR}/libduckdb_static.a")
+        IMPORTED_LOCATION "${DUCKDB_STATIC_ARCHIVE}")
 endif()
 endif()
 FetchContent_MakeAvailable(duckdb_ext)
