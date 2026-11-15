@@ -446,6 +446,17 @@ if(MSVC AND DUCQ_CURL_ROOT AND CURL_FOUND)
     # curl.h is seen; DuckDB's extension targets are configured later in this
     # same process and pick the definition up from directory scope.
     add_compile_definitions(CURL_STATICLIB)
+    # The curl config exports Debug and Release variants but no
+    # MAP_IMPORTED_CONFIG_RELWITHDEBINFO, and CMake's fallback picks the
+    # FIRST imported configuration — Debug (MSVCRTD), whose CRT references
+    # cannot resolve next to the release everything else links. Map our
+    # non-Debug configurations to Release explicitly.
+    if(TARGET CURL::libcurl)
+        set_property(TARGET CURL::libcurl APPEND PROPERTY
+            MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release)
+        set_property(TARGET CURL::libcurl APPEND PROPERTY
+            MAP_IMPORTED_CONFIG_MINSIZEREL Release)
+    endif()
 endif()
 if(NOT CURL_FOUND)
     message(STATUS "DucQ: CURL not found — building without httpfs/postgres_scanner (S3/URL reads, ATTACH Postgres; install libcurl4-openssl-dev)")
