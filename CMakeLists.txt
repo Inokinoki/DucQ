@@ -403,14 +403,20 @@ if(DUCQ_CURL_ROOT)
     # CURLConfig.cmake runs find_dependency(ZLIB), and CMake's FindZLIB
     # misses the vcpkg install (its config is a toolchain-only wrapper pair,
     # and the module search resolved the header but not the library), so
-    # hand FindZLIB the pieces. The static lib's location moved across vcpkg
-    # vintages (lib/, lib/manual_link/), so check the known spots and fall
-    # back to a recursive, debug-filtered sweep.
+    # hand FindZLIB the pieces. The static lib's name moved across zlib
+    # vintages — current vcpkg ships libzs.lib (see the port's pkgconfig
+    # rewrite), older ones zlib.lib/zlibstatic.lib — and manual_link/
+    # trees exist on some layouts, hence the candidate list and the
+    # recursive, debug-filtered sweep behind it.
     find_path(DUCQ_ZLIB_INCLUDE_DIR zlib.h
         PATHS "${DUCQ_CURL_ROOT}/include" NO_DEFAULT_PATH)
     set(DUCQ_ZLIB_LIBRARY "")
-    foreach(_cand "${DUCQ_CURL_ROOT}/lib/zlib.lib"
+    foreach(_cand "${DUCQ_CURL_ROOT}/lib/libzs.lib"
+                  "${DUCQ_CURL_ROOT}/lib/zs.lib"
+                  "${DUCQ_CURL_ROOT}/lib/zlib.lib"
                   "${DUCQ_CURL_ROOT}/lib/zlibstatic.lib"
+                  "${DUCQ_CURL_ROOT}/lib/manual_link/libzs.lib"
+                  "${DUCQ_CURL_ROOT}/lib/manual_link/zs.lib"
                   "${DUCQ_CURL_ROOT}/lib/manual_link/zlib.lib"
                   "${DUCQ_CURL_ROOT}/lib/manual_link/zlibstatic.lib")
         if(EXISTS "${_cand}")
@@ -419,9 +425,9 @@ if(DUCQ_CURL_ROOT)
         endif()
     endforeach()
     if(NOT DUCQ_ZLIB_LIBRARY)
-        file(GLOB_RECURSE DUCQ_ZLIB_GLOB "${DUCQ_CURL_ROOT}/*zlib*.lib")
+        file(GLOB_RECURSE DUCQ_ZLIB_GLOB "${DUCQ_CURL_ROOT}/*.lib")
         list(FILTER DUCQ_ZLIB_GLOB EXCLUDE REGEX "/debug/")
-        list(FILTER DUCQ_ZLIB_GLOB EXCLUDE REGEX "zlib(d1|staticd|d)\\.lib$")
+        list(FILTER DUCQ_ZLIB_GLOB INCLUDE REGEX "/(lib)?(zs|zlib|zlibstatic)(d(1)?)?\\.lib$")
         if(DUCQ_ZLIB_GLOB)
             list(GET DUCQ_ZLIB_GLOB 0 DUCQ_ZLIB_LIBRARY)
         endif()
