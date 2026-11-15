@@ -400,6 +400,24 @@ endif()
 # inherits the same prefix path.
 if(DUCQ_CURL_ROOT)
     list(PREPEND CMAKE_PREFIX_PATH "${DUCQ_CURL_ROOT}")
+    # CURLConfig.cmake runs find_dependency(ZLIB), and CMake's FindZLIB
+    # misses the vcpkg install (its config is a toolchain-only wrapper pair,
+    # and the module search fails on the static triplet's layout), while the
+    # header still resolves — FPHSA then reports a bare ZLIB_LIBRARY miss.
+    # Hand FindZLIB the pieces directly, by glob rather than name guessing:
+    # vcpkg's static zlib is zlib.lib or zlibstatic.lib depending on port
+    # vintage. With the cache variables set, every later find_package(ZLIB)
+    # — CURLConfig's included — resolves without searching.
+    find_path(DUCQ_ZLIB_INCLUDE_DIR zlib.h
+        PATHS "${DUCQ_CURL_ROOT}/include" NO_DEFAULT_PATH)
+    file(GLOB DUCQ_ZLIB_CANDIDATES "${DUCQ_CURL_ROOT}/lib/zlib*.lib")
+    if(DUCQ_ZLIB_INCLUDE_DIR AND DUCQ_ZLIB_CANDIDATES)
+        list(GET DUCQ_ZLIB_CANDIDATES 0 DUCQ_ZLIB_LIBRARY)
+        set(ZLIB_INCLUDE_DIR "${DUCQ_ZLIB_INCLUDE_DIR}" CACHE PATH "" FORCE)
+        set(ZLIB_LIBRARY "${DUCQ_ZLIB_LIBRARY}" CACHE FILEPATH "" FORCE)
+    else()
+        message(WARNING "DucQ: DUCQ_CURL_ROOT given but zlib not found under it — CURL's ZLIB dependency will fail")
+    endif()
 endif()
 find_package(CURL QUIET)
 if(MSVC AND DUCQ_CURL_ROOT AND CURL_FOUND)
