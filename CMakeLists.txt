@@ -450,12 +450,21 @@ if(MSVC AND DUCQ_CURL_ROOT AND CURL_FOUND)
     # MAP_IMPORTED_CONFIG_RELWITHDEBINFO, and CMake's fallback picks the
     # FIRST imported configuration — Debug (MSVCRTD), whose CRT references
     # cannot resolve next to the release everything else links. Map our
-    # non-Debug configurations to Release explicitly.
+    # non-Debug configurations to Release explicitly — on the real target,
+    # since CURL::libcurl may be an ALIAS (of libcurl_static on static
+    # triplets) and set_property refuses aliases.
     if(TARGET CURL::libcurl)
-        set_property(TARGET CURL::libcurl APPEND PROPERTY
+        get_property(_curl_aliased TARGET CURL::libcurl PROPERTY ALIASED_TARGET)
+        set(_curl_real "${_curl_aliased}")
+        if(NOT _curl_real)
+            set(_curl_real CURL::libcurl)
+        endif()
+        set_property(TARGET ${_curl_real} APPEND PROPERTY
             MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release)
-        set_property(TARGET CURL::libcurl APPEND PROPERTY
+        set_property(TARGET ${_curl_real} APPEND PROPERTY
             MAP_IMPORTED_CONFIG_MINSIZEREL Release)
+        unset(_curl_aliased)
+        unset(_curl_real)
     endif()
 endif()
 if(NOT CURL_FOUND)
