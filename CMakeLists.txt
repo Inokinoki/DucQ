@@ -641,6 +641,13 @@ if(MSVC AND DUCQ_CURL_ROOT)
             unset(_osl_real)
         endif()
     endforeach()
+    # quack predates imported targets: it links ${OPENSSL_LIBRARIES}, so no
+    # interface property can reach it — append the CRT import libs to its
+    # loadable directly.
+    if(TARGET quack_loadable_extension)
+        target_link_libraries(quack_loadable_extension PRIVATE
+            ucrt.lib msvcrt.lib vcruntime.lib)
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------
