@@ -90,14 +90,14 @@ jobs:
         run: vcpkg install "curl[openssl]" --triplet x64-windows-static-md
 
       - name: Cache vcpkg binaries (Linux)
-        if: matrix.vcpkg_args != ''
+        if: runner.os == 'Linux' && matrix.vcpkg_args != ''
         uses: actions/cache@v4
         with:
           path: ~/.cache/vcpkg/archives
           key: vcpkg-openssl-x64-linux-1
 
       - name: Install OpenSSL via vcpkg (Linux)
-        if: matrix.vcpkg_args != ''
+        if: runner.os == 'Linux' && matrix.vcpkg_args != ''
         shell: bash
         run: /usr/local/share/vcpkg/vcpkg install openssl --triplet x64-linux
 
