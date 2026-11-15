@@ -620,6 +620,29 @@ if(DUCQ_QUACK AND EXISTS "${_quack_keygen}")
 endif()
 unset(_quack_keygen)
 
+# Extensions that link the vcpkg OpenSSL directly (quack needs its SSL for
+# the self-signed keygen; httpfs too) hit the same missing-UCRT-imports
+# problem as curl: their /MD static archives reference __imp_* UCRT symbols
+# and the loadable link lines carry no CRT import libs. Ride the libraries
+# on OpenSSL's interface — evaluated at generate time, so adding it here
+# after the targets linked OpenSSL still applies to their links. Alias-safe
+# like the curl block above.
+if(MSVC AND DUCQ_CURL_ROOT)
+    foreach(_osl_target OpenSSL::SSL OpenSSL::Crypto)
+        if(TARGET "${_osl_target}")
+            get_property(_osl_aliased TARGET "${_osl_target}" PROPERTY ALIASED_TARGET)
+            set(_osl_real "${_osl_aliased}")
+            if(NOT _osl_real)
+                set(_osl_real "${_osl_target}")
+            endif()
+            set_property(TARGET ${_osl_real} APPEND PROPERTY
+                INTERFACE_LINK_LIBRARIES ucrt.lib msvcrt.lib vcruntime.lib)
+            unset(_osl_aliased)
+            unset(_osl_real)
+        endif()
+    endforeach()
+endif()
+
 # ---------------------------------------------------------------------------
 # Generated static-extension loader (both build modes).
 #
