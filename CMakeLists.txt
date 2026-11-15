@@ -402,21 +402,36 @@ if(DUCQ_CURL_ROOT)
     list(PREPEND CMAKE_PREFIX_PATH "${DUCQ_CURL_ROOT}")
     # CURLConfig.cmake runs find_dependency(ZLIB), and CMake's FindZLIB
     # misses the vcpkg install (its config is a toolchain-only wrapper pair,
-    # and the module search fails on the static triplet's layout), while the
-    # header still resolves — FPHSA then reports a bare ZLIB_LIBRARY miss.
-    # Hand FindZLIB the pieces directly, by glob rather than name guessing:
-    # vcpkg's static zlib is zlib.lib or zlibstatic.lib depending on port
-    # vintage. With the cache variables set, every later find_package(ZLIB)
-    # — CURLConfig's included — resolves without searching.
+    # and the module search resolved the header but not the library), so
+    # hand FindZLIB the pieces. The static lib's location moved across vcpkg
+    # vintages (lib/, lib/manual_link/), so check the known spots and fall
+    # back to a recursive, debug-filtered sweep.
     find_path(DUCQ_ZLIB_INCLUDE_DIR zlib.h
         PATHS "${DUCQ_CURL_ROOT}/include" NO_DEFAULT_PATH)
-    file(GLOB DUCQ_ZLIB_CANDIDATES "${DUCQ_CURL_ROOT}/lib/zlib*.lib")
-    if(DUCQ_ZLIB_INCLUDE_DIR AND DUCQ_ZLIB_CANDIDATES)
-        list(GET DUCQ_ZLIB_CANDIDATES 0 DUCQ_ZLIB_LIBRARY)
+    set(DUCQ_ZLIB_LIBRARY "")
+    foreach(_cand "${DUCQ_CURL_ROOT}/lib/zlib.lib"
+                  "${DUCQ_CURL_ROOT}/lib/zlibstatic.lib"
+                  "${DUCQ_CURL_ROOT}/lib/manual_link/zlib.lib"
+                  "${DUCQ_CURL_ROOT}/lib/manual_link/zlibstatic.lib")
+        if(EXISTS "${_cand}")
+            set(DUCQ_ZLIB_LIBRARY "${_cand}")
+            break()
+        endif()
+    endforeach()
+    if(NOT DUCQ_ZLIB_LIBRARY)
+        file(GLOB_RECURSE DUCQ_ZLIB_GLOB "${DUCQ_CURL_ROOT}/*zlib*.lib")
+        list(FILTER DUCQ_ZLIB_GLOB EXCLUDE REGEX "/debug/")
+        list(FILTER DUCQ_ZLIB_GLOB EXCLUDE REGEX "zlib(d1|staticd|d)\\.lib$")
+        if(DUCQ_ZLIB_GLOB)
+            list(GET DUCQ_ZLIB_GLOB 0 DUCQ_ZLIB_LIBRARY)
+        endif()
+    endif()
+    if(DUCQ_ZLIB_INCLUDE_DIR AND DUCQ_ZLIB_LIBRARY)
         set(ZLIB_INCLUDE_DIR "${DUCQ_ZLIB_INCLUDE_DIR}" CACHE PATH "" FORCE)
         set(ZLIB_LIBRARY "${DUCQ_ZLIB_LIBRARY}" CACHE FILEPATH "" FORCE)
     else()
-        message(WARNING "DucQ: DUCQ_CURL_ROOT given but zlib not found under it — CURL's ZLIB dependency will fail")
+        message(WARNING "DucQ: DUCQ_CURL_ROOT given but zlib not found under it "
+            "(include=${DUCQ_ZLIB_INCLUDE_DIR}, sweep=${DUCQ_ZLIB_GLOB}) — CURL's ZLIB dependency will fail")
     endif()
 endif()
 find_package(CURL QUIET)
