@@ -463,6 +463,12 @@ if(MSVC AND DUCQ_CURL_ROOT AND CURL_FOUND)
             MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release)
         set_property(TARGET ${_curl_real} APPEND PROPERTY
             MAP_IMPORTED_CONFIG_MINSIZEREL Release)
+        # The static /MD-built curl and OpenSSL reference the UCRT through
+        # __imp_* imports that nothing on the loadable link line provides,
+        # so name the CRT import libs here and let every consumer inherit
+        # them through the interface.
+        set_property(TARGET ${_curl_real} APPEND PROPERTY
+            INTERFACE_LINK_LIBRARIES ucrt.lib msvcrt.lib vcruntime.lib)
         unset(_curl_aliased)
         unset(_curl_real)
     endif()
