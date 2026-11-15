@@ -118,9 +118,14 @@ QWidget *QuackServeDialog::serverRow(const QuackServerEntry &entry)
     tokenLine->addWidget(copyButton);
 
     // The full statement a client needs, ready to paste into any DuckDB —
-    // saves assembling host, port and token by hand on the other side.
+    // saves assembling host, port and token by hand on the other side. Both
+    // interpolations are SQL-string-escaped so a stray quote anywhere in
+    // them cannot break the pasted statement.
+    const auto escaped = [](QString s) {
+        return s.replace(u'\'', QStringLiteral("''"));
+    };
     const QString attachSql = QStringLiteral("ATTACH '%1' AS remote (TOKEN '%2');")
-                                  .arg(entry.uri, QString(entry.token).replace(u'\'', QStringLiteral("''")));
+                                  .arg(escaped(entry.uri), escaped(entry.token));
     auto *attachButton = new QToolButton(row);
     attachButton->setText(QStringLiteral("SQL"));
     attachButton->setToolTip(tr("Copy ATTACH statement"));
