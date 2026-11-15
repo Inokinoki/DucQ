@@ -21,7 +21,11 @@
 // loader, and building it alone is inert.
 extern "C" {
 int32_t duckdb_register_static_extensions(void);
+#ifdef DUCQ_STATIC_MYSQL
+// Defined by the mysql pack's hand-written describe stub (CMakeLists.txt);
+// absent when libmariadb was not found and mysql_scanner was skipped.
 int32_t duckdb_extension_mysql_scanner_describe(duckdb_extension_descriptor *);
+#endif
 }
 
 namespace ducq {
@@ -32,9 +36,11 @@ struct ExtensionEntry {
     int32_t (*describe)(duckdb_extension_descriptor *);
 };
 
+#ifdef DUCQ_STATIC_MYSQL
 const ExtensionEntry kExtensions[] = {
     {"mysql_scanner", duckdb_extension_mysql_scanner_describe},
 };
+#endif
 
 std::once_flag g_registered;
 
@@ -45,8 +51,10 @@ void registerStaticExtensions()
     std::call_once(g_registered, [] {
         // Registers every extension statically linked into the engine.
         duckdb_register_static_extensions();
+#ifdef DUCQ_STATIC_MYSQL
         for (const ExtensionEntry &entry : kExtensions)
             duckdb_register_static_extension(entry.describe);
+#endif
     });
 }
 

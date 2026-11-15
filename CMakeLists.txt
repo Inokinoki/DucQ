@@ -118,6 +118,11 @@ foreach(_name IN LISTS DUCKDB_LIB_NAMES)
     if(NOT _found)
         message(FATAL_ERROR "DuckDB static library not found in ${duckdb_libs_SOURCE_DIR}: ${_name}")
     endif()
+    if(_name STREQUAL "duckdb_static")
+        # Reused by the BUILD_EXTENSIONS_ONLY alias below; the platform suffix
+        # differs (.lib on Windows, .a elsewhere).
+        set(DUCKDB_STATIC_ARCHIVE "${_found}")
+    endif()
     list(APPEND DUCKDB_LINK_LIBS "${_found}")
 endforeach()
 
@@ -297,6 +302,7 @@ find_path(MARIADB_INCLUDE_DIR mysql.h
 find_library(MARIADB_LIBRARY mariadb
     HINTS /opt/homebrew/opt/mariadb-connector-c/lib /usr/lib /usr/local/lib)
 if(MARIADB_INCLUDE_DIR AND MARIADB_LIBRARY)
+    set(DUCQ_MYSQL_ENABLED ON)
     # mysql_catalog.cpp / mysql_schema_entry.cpp define un-namespaced free
     # helpers (GetSecret, CatalogTypeIsSupported) that postgres' copies of the
     # same code also define — fine for separate loadables, a collision when
@@ -327,7 +333,16 @@ endif()
     message(STATUS "DucQ: libmariadb found — enabling mysql_scanner (${MARIADB_LIBRARY})")
 else()
     message(STATUS "DucQ: libmariadb not found — building without mysql_scanner")
+    set(DUCQ_MYSQL_ENABLED OFF)
     ducq_skip_extension(mysql_scanner)
+endif()
+
+# core/StaticExtensions.cpp references mysql's describe entry point only when
+# the packed archive exists; without the definition the reference compiles
+# out instead of breaking the link on machines (and CI runners) without
+# libmariadb.
+if(DUCQ_MYSQL_ENABLED)
+    add_compile_definitions(DUCQ_STATIC_MYSQL=1)
 endif()
 
 # delta builds its Rust kernel via cargo; probe rustc like the other external
@@ -341,6 +356,146 @@ if(NOT DUCQ_RUSTC_RESULT STREQUAL "0")
     ducq_skip_extension(delta)
 endif()
 unset(DUCQ_RUSTC_VERSION)
+
+# delta's Linux cargo build forces OPENSSL_STATIC with vcpkg's OpenSSL layout:
+# OPENSSL_LIB_DIR/OPENSSL_INCLUDE_DIR under ${CMAKE_BINARY_DIR}/
+# vcpkg_installed/<triplet> — and outside vcpkg the triplet is empty. The env
+# vars are baked into its ExternalProject at configure time, so instead of
+# patching the fetched extension, materialize the directory it expects from a
+# vcpkg-built static OpenSSL (CI: `vcpkg install openssl --triplet x64-linux`,
+# root passed as DUCQ_VCPKG_OPENSSL_ROOT). vcpkg's archives are self-contained
+# — unlike distro libcrypto.a, which drags in zlib/zstd/jitterentropy and
+# aborts cargo's internal link. Absent root: skip delta like the other
+# probed dependencies (macOS/Windows need none of this; their OpenSSL is
+# discovered through the extension's own non-Linux branches).
+if(UNIX AND NOT APPLE)
+    if(DUCQ_VCPKG_OPENSSL_ROOT
+       AND EXISTS "${DUCQ_VCPKG_OPENSSL_ROOT}/lib/libcrypto.a"
+       AND EXISTS "${DUCQ_VCPKG_OPENSSL_ROOT}/lib/libssl.a"
+       AND EXISTS "${DUCQ_VCPKG_OPENSSL_ROOT}/include/openssl/ssl.h")
+        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/vcpkg_installed/lib"
+                            "${CMAKE_BINARY_DIR}/vcpkg_installed/include")
+        file(COPY "${DUCQ_VCPKG_OPENSSL_ROOT}/lib/libssl.a"
+                  "${DUCQ_VCPKG_OPENSSL_ROOT}/lib/libcrypto.a"
+             DESTINATION "${CMAKE_BINARY_DIR}/vcpkg_installed/lib")
+        file(COPY "${DUCQ_VCPKG_OPENSSL_ROOT}/include/openssl"
+             DESTINATION "${CMAKE_BINARY_DIR}/vcpkg_installed/include")
+        message(STATUS "DucQ: materialized vcpkg OpenSSL layout for delta (${DUCQ_VCPKG_OPENSSL_ROOT})")
+    else()
+        message(STATUS "DucQ: no vcpkg static OpenSSL for delta (set DUCQ_VCPKG_OPENSSL_ROOT) — building without delta")
+        ducq_skip_extension(delta)
+    endif()
+endif()
+
+# httpfs resolves CURL through find_package at configure time (its vcpkg.json
+# names curl+openssl); slim images and CI runners sometimes lack the dev
+# headers, and a missing CURL must not fail the whole build. postgres_scanner
+# piggybacks on the same discovery: its loadable target links CURL_LIBRARIES
+# without searching, expecting httpfs's find_package to have populated it —
+# with httpfs skipped, nothing would, so drop postgres here too.
+#
+# DUCQ_CURL_ROOT points at a vcpkg tree (x64-windows-static-md on CI, where
+# MSVC has no discoverable system curl) and is searched first; everything
+# configured after the probe — DuckDB's own httpfs/quack find_package calls —
+# inherits the same prefix path.
+if(DUCQ_CURL_ROOT)
+    list(PREPEND CMAKE_PREFIX_PATH "${DUCQ_CURL_ROOT}")
+    # CURLConfig.cmake runs find_dependency(ZLIB), and CMake's FindZLIB
+    # misses the vcpkg install (its config is a toolchain-only wrapper pair,
+    # and the module search resolved the header but not the library), so
+    # hand FindZLIB the pieces. The static lib's name moved across zlib
+    # vintages — current vcpkg ships libzs.lib (see the port's pkgconfig
+    # rewrite), older ones zlib.lib/zlibstatic.lib — and manual_link/
+    # trees exist on some layouts, hence the candidate list and the
+    # recursive, debug-filtered sweep behind it.
+    find_path(DUCQ_ZLIB_INCLUDE_DIR zlib.h
+        PATHS "${DUCQ_CURL_ROOT}/include" NO_DEFAULT_PATH)
+    set(DUCQ_ZLIB_LIBRARY "")
+    foreach(_cand "${DUCQ_CURL_ROOT}/lib/libzs.lib"
+                  "${DUCQ_CURL_ROOT}/lib/zs.lib"
+                  "${DUCQ_CURL_ROOT}/lib/zlib.lib"
+                  "${DUCQ_CURL_ROOT}/lib/zlibstatic.lib"
+                  "${DUCQ_CURL_ROOT}/lib/manual_link/libzs.lib"
+                  "${DUCQ_CURL_ROOT}/lib/manual_link/zs.lib"
+                  "${DUCQ_CURL_ROOT}/lib/manual_link/zlib.lib"
+                  "${DUCQ_CURL_ROOT}/lib/manual_link/zlibstatic.lib")
+        if(EXISTS "${_cand}")
+            set(DUCQ_ZLIB_LIBRARY "${_cand}")
+            break()
+        endif()
+    endforeach()
+    if(NOT DUCQ_ZLIB_LIBRARY)
+        file(GLOB_RECURSE DUCQ_ZLIB_GLOB "${DUCQ_CURL_ROOT}/*.lib")
+        list(FILTER DUCQ_ZLIB_GLOB EXCLUDE REGEX "/debug/")
+        list(FILTER DUCQ_ZLIB_GLOB INCLUDE REGEX "/(lib)?(zs|zlib|zlibstatic)(d(1)?)?\\.lib$")
+        if(DUCQ_ZLIB_GLOB)
+            list(GET DUCQ_ZLIB_GLOB 0 DUCQ_ZLIB_LIBRARY)
+        endif()
+    endif()
+    if(DUCQ_ZLIB_INCLUDE_DIR AND DUCQ_ZLIB_LIBRARY)
+        set(ZLIB_INCLUDE_DIR "${DUCQ_ZLIB_INCLUDE_DIR}" CACHE PATH "" FORCE)
+        set(ZLIB_LIBRARY "${DUCQ_ZLIB_LIBRARY}" CACHE FILEPATH "" FORCE)
+    else()
+        message(WARNING "DucQ: DUCQ_CURL_ROOT given but zlib not found under it "
+            "(include=${DUCQ_ZLIB_INCLUDE_DIR}, sweep=${DUCQ_ZLIB_GLOB}) — CURL's ZLIB dependency will fail")
+    endif()
+endif()
+find_package(CURL QUIET)
+if(MSVC AND DUCQ_CURL_ROOT AND CURL_FOUND)
+    # vcpkg's static-md curl needs consumers to opt out of dllimport before
+    # curl.h is seen; DuckDB's extension targets are configured later in this
+    # same process and pick the definition up from directory scope.
+    add_compile_definitions(CURL_STATICLIB)
+    # The curl config exports Debug and Release variants but no
+    # MAP_IMPORTED_CONFIG_RELWITHDEBINFO, and CMake's fallback picks the
+    # FIRST imported configuration — Debug (MSVCRTD), whose CRT references
+    # cannot resolve next to the release everything else links. Map our
+    # non-Debug configurations to Release explicitly — on the real target,
+    # since CURL::libcurl may be an ALIAS (of libcurl_static on static
+    # triplets) and set_property refuses aliases.
+    if(TARGET CURL::libcurl)
+        get_property(_curl_aliased TARGET CURL::libcurl PROPERTY ALIASED_TARGET)
+        set(_curl_real "${_curl_aliased}")
+        if(NOT _curl_real)
+            set(_curl_real CURL::libcurl)
+        endif()
+        set_property(TARGET ${_curl_real} APPEND PROPERTY
+            MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release)
+        set_property(TARGET ${_curl_real} APPEND PROPERTY
+            MAP_IMPORTED_CONFIG_MINSIZEREL Release)
+        # The static /MD-built curl and OpenSSL reference the UCRT through
+        # __imp_* imports that nothing on the loadable link line provides,
+        # so name the CRT import libs here and let every consumer inherit
+        # them through the interface.
+        set_property(TARGET ${_curl_real} APPEND PROPERTY
+            INTERFACE_LINK_LIBRARIES ucrt.lib msvcrt.lib vcruntime.lib)
+        unset(_curl_aliased)
+        unset(_curl_real)
+    endif()
+endif()
+if(NOT CURL_FOUND)
+    message(STATUS "DucQ: CURL not found — building without httpfs/postgres_scanner (S3/URL reads, ATTACH Postgres; install libcurl4-openssl-dev)")
+    ducq_skip_extension(httpfs)
+    ducq_skip_extension(postgres_scanner)
+endif()
+
+# iceberg and ducklake hard-require CRoaring (find_package(roaring CONFIG
+# REQUIRED) in their own CMakeLists); nothing universally provides the
+# expected roaringConfig.cmake, so drop both gracefully when it is absent.
+find_package(roaring QUIET CONFIG)
+if(NOT roaring_FOUND)
+    message(STATUS "DucQ: roaring not found — building without iceberg/ducklake (vcpkg install roaring)")
+    ducq_skip_extension(iceberg)
+    ducq_skip_extension(ducklake)
+endif()
+
+# Export what survived the probes to the tests: testQuackRegistered asserts
+# httpfs's registration only when the build actually ships it (runners
+# without a findable CURL legitimately build without it).
+if("httpfs" IN_LIST DUCKDB_OOTE_SOURCES)
+    add_compile_definitions(DUCQ_HTTPFS=1)
+endif()
+
 FetchContent_Declare(duckdb_ext
     GIT_REPOSITORY "https://github.com/duckdb/duckdb.git"
     GIT_TAG "v2.0.0"
@@ -367,7 +522,10 @@ if(DUCQ_DYNAMIC_EXTENSIONS)
     # loadable_extensions is DuckDB's pseudo-extension carrying the INSTALL/
     # LOAD machinery; registering it wires the dynamic provider per database.
     set(DUCQ_LOADER_EXTS loadable_extensions core_functions parquet json icu autocomplete tpch tpcds)
-    if(NOT MINGW)
+    # postgres only when it survived the dependency probes above — the loader
+    # stub declares a describe entry for every name here, and referencing a
+    # skipped extension's symbol breaks the link.
+    if(NOT MINGW AND "postgres_scanner" IN_LIST DUCKDB_EXT_SOURCES)
         list(INSERT DUCQ_LOADER_EXTS 4 postgres_scanner)
     endif()
     set(DUCQ_LOADER_INCLUDE_DIRS
@@ -421,11 +579,26 @@ endif()
 if(NOT DUCQ_DYNAMIC_EXTENSIONS)
 # The extension build links its loadable artifacts against a duckdb_static
 # target, which BUILD_EXTENSIONS_ONLY does not create. Alias it to the
-# prebuilt archive (same v2.0.0 tag, so the symbols all resolve).
+# prebuilt archive (same v2.0.0 tag, so the symbols all resolve); the archive
+# suffix is platform-dependent, so use the path the link loop resolved.
+# The loadables also link their source-built third-party archives, and the
+# prebuilt engine embeds the same libraries as one LTO lump: BFD ld reports
+# multiple definitions, so let the first definition win on ELF toolchains —
+# the loadables are never loaded by the static binary anyway (dynamic
+# loading is compiled out). MSVC resolves archive duplicates on demand and
+# instead cannot link a DLL with unresolved engine symbols; it needs the
+# archive for the API plus Restart Manager for the file-lock diagnostics.
 if(NOT TARGET duckdb_static)
     add_library(duckdb_static STATIC IMPORTED GLOBAL)
     set_target_properties(duckdb_static PROPERTIES
-        IMPORTED_LOCATION "${duckdb_libs_SOURCE_DIR}/libduckdb_static.a")
+        IMPORTED_LOCATION "${DUCKDB_STATIC_ARCHIVE}")
+    if(UNIX AND NOT APPLE)
+        set_property(TARGET duckdb_static APPEND PROPERTY
+            INTERFACE_LINK_LIBRARIES "-Wl,--allow-multiple-definition")
+    elseif(MSVC)
+        set_property(TARGET duckdb_static APPEND PROPERTY
+            INTERFACE_LINK_LIBRARIES Rstrtmgr.lib)
+    endif()
 endif()
 endif()
 FetchContent_MakeAvailable(duckdb_ext)
@@ -446,6 +619,37 @@ if(DUCQ_QUACK AND EXISTS "${_quack_keygen}")
     unset(_quack_content)
 endif()
 unset(_quack_keygen)
+
+# Extensions that link the vcpkg OpenSSL directly (quack needs its SSL for
+# the self-signed keygen; httpfs too) hit the same missing-UCRT-imports
+# problem as curl: their /MD static archives reference __imp_* UCRT symbols
+# and the loadable link lines carry no CRT import libs. Ride the libraries
+# on OpenSSL's interface — evaluated at generate time, so adding it here
+# after the targets linked OpenSSL still applies to their links. Alias-safe
+# like the curl block above.
+if(MSVC AND DUCQ_CURL_ROOT)
+    foreach(_osl_target OpenSSL::SSL OpenSSL::Crypto)
+        if(TARGET "${_osl_target}")
+            get_property(_osl_aliased TARGET "${_osl_target}" PROPERTY ALIASED_TARGET)
+            set(_osl_real "${_osl_aliased}")
+            if(NOT _osl_real)
+                set(_osl_real "${_osl_target}")
+            endif()
+            set_property(TARGET ${_osl_real} APPEND PROPERTY
+                INTERFACE_LINK_LIBRARIES ucrt.lib msvcrt.lib vcruntime.lib)
+            unset(_osl_aliased)
+            unset(_osl_real)
+        endif()
+    endforeach()
+    # quack predates imported targets: it links ${OPENSSL_LIBRARIES}, so no
+    # interface property can reach it — append the CRT import libs to its
+    # loadable directly.
+    if(TARGET quack_loadable_extension)
+        # quack links with the plain (non-keyword) signature; ours must match.
+        target_link_libraries(quack_loadable_extension
+            ucrt.lib msvcrt.lib vcruntime.lib)
+    endif()
+endif()
 
 # ---------------------------------------------------------------------------
 # Generated static-extension loader (both build modes).
@@ -803,25 +1007,35 @@ add_test(NAME test_core COMMAND test_core)
 
 if(DUCQ_DYNAMIC_EXTENSIONS)
     # Install the out-of-tree loadables next to the executable, where
-    # core/ExtensionLoader finds and LOADs them at startup.
+    # core/ExtensionLoader finds and LOADs them at startup. Only the built
+    # artifacts are copied (scripts/collect_loadables.cmake): the whole
+    # extension tree holds intermediates that are still being written while
+    # the copy runs, and a whole-tree copy raced the last links (ENOENT).
     add_custom_target(ducq_collect_loadables ALL
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-                "$<TARGET_FILE_DIR:DucQ>/extensions"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-                "${duckdb_ext_BINARY_DIR}/extension"
-                "$<TARGET_FILE_DIR:DucQ>/extensions"
+        COMMAND ${CMAKE_COMMAND} -DCOLLECT_SRC="${duckdb_ext_BINARY_DIR}/extension"
+                -DCOLLECT_DST="$<TARGET_FILE_DIR:DucQ>/extensions"
+                -P "${CMAKE_CURRENT_LIST_DIR}/scripts/collect_loadables.cmake"
         COMMENT "Collecting *.duckdb_extension loadables"
         DEPENDS DucQ)
     # Same for the test binary, so extension-dependent tests (the quack
     # loopback) exercise the real load path there instead of skipping.
     add_custom_target(ducq_collect_loadables_test ALL
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-                "$<TARGET_FILE_DIR:test_core>/extensions"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-                "${duckdb_ext_BINARY_DIR}/extension"
-                "$<TARGET_FILE_DIR:test_core>/extensions"
+        COMMAND ${CMAKE_COMMAND} -DCOLLECT_SRC="${duckdb_ext_BINARY_DIR}/extension"
+                -DCOLLECT_DST="$<TARGET_FILE_DIR:test_core>/extensions"
+                -P "${CMAKE_CURRENT_LIST_DIR}/scripts/collect_loadables.cmake"
         COMMENT "Collecting *.duckdb_extension loadables for tests"
         DEPENDS test_core)
+    # The copies must wait for every loadable — the out-of-tree ones and the
+    # in-tree ones DuckDB's dynamic build also produces as loadables:
+    # depending only on the executables let the copy run while extensions
+    # were still building, and a half-populated directory silently degraded
+    # the LOAD path (no httpfs => quack_serve fails on the missing crypto).
+    foreach(_ext IN LISTS DUCKDB_EXT_SOURCES core_functions parquet json icu)
+        if(TARGET ${_ext}_loadable_extension)
+            add_dependencies(ducq_collect_loadables ${_ext}_loadable_extension)
+            add_dependencies(ducq_collect_loadables_test ${_ext}_loadable_extension)
+        endif()
+    endforeach()
 endif()
 
 if(TARGET mysql_scanner_pack)
