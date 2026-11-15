@@ -17,6 +17,7 @@ jobs:
           - name: linux
             os: ubuntu-latest
             cmake_args: ""
+            vcpkg_args: -DDUCQ_VCPKG_OPENSSL_ROOT=/usr/local/share/vcpkg/installed/x64-linux
             screenshot: true
           - name: macos
             os: macos-latest
@@ -25,11 +26,13 @@ jobs:
           - name: windows
             os: windows-latest
             cmake_args: ""
+            vcpkg_args: -DDUCQ_CURL_ROOT=C:/vcpkg/installed/x64-windows-static-md
             screenshot: true
           # Quack compiled out — keeps the DUCQ_QUACK=OFF combination honest.
           - name: linux-noquack
             os: ubuntu-latest
             cmake_args: -DDUCQ_QUACK=OFF
+            vcpkg_args: -DDUCQ_VCPKG_OPENSSL_ROOT=/usr/local/share/vcpkg/installed/x64-linux
             screenshot: false
           - name: macos-noquack
             os: macos-latest
@@ -38,6 +41,7 @@ jobs:
           - name: windows-noquack
             os: windows-latest
             cmake_args: -DDUCQ_QUACK=OFF
+            vcpkg_args: -DDUCQ_CURL_ROOT=C:/vcpkg/installed/x64-windows-static-md
             screenshot: false
           # Engine built from source with INSTALL/LOAD enabled. Heaviest leg
           # (the whole engine compiles), so it runs on one platform only; the
@@ -69,8 +73,36 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
+      # vcpkg fills the two platform gaps: Windows has no findable system
+      # curl for MSVC (httpfs/S3), and delta's Linux cargo build insists on
+      # vcpkg's static OpenSSL layout. Binary-cached, so only the first run
+      # pays the source builds.
+      - name: Cache vcpkg binaries (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: C:\Users\runneradmin\AppData\Local\vcpkg\archives
+          key: vcpkg-curl-openssl-x64-windows-static-md-1
+
+      - name: Install curl via vcpkg (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: vcpkg install "curl[openssl]" --triplet x64-windows-static-md
+
+      - name: Cache vcpkg binaries (Linux)
+        if: matrix.vcpkg_args != ''
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/vcpkg/archives
+          key: vcpkg-openssl-x64-linux-1
+
+      - name: Install OpenSSL via vcpkg (Linux)
+        if: matrix.vcpkg_args != ''
+        shell: bash
+        run: /usr/local/share/vcpkg/vcpkg install openssl --triplet x64-linux
+
       - name: Configure
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo ${{ matrix.cmake_args }}
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo ${{ matrix.cmake_args }} ${{ matrix.vcpkg_args }}
 
       - name: Build
         run: cmake --build build --parallel

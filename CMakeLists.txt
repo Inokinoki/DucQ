@@ -357,18 +357,34 @@ if(NOT DUCQ_RUSTC_RESULT STREQUAL "0")
 endif()
 unset(DUCQ_RUSTC_VERSION)
 
-# delta's Linux cargo build forces OPENSSL_STATIC with vcpkg's OpenSSL layout
-# (vcpkg_installed/<triplet>, an empty triplet outside vcpkg), and the env
-# vars are baked into its ExternalProject command at configure time — too
-# early to patch the fetched extension from here. Feeding it a static
-# libcrypto.a doesn't work either: distro archives reference a tail of
-# private dependencies (zlib, zstd, jitterentropy — the last one not even
-# packaged on current Ubuntu). Until delta grows a non-vcpkg OpenSSL path
-# (e.g. openssl-sys's vendored feature), build it only where its defaults
-# work: macOS (system-discovered dynamic OpenSSL) and Windows.
+# delta's Linux cargo build forces OPENSSL_STATIC with vcpkg's OpenSSL layout:
+# OPENSSL_LIB_DIR/OPENSSL_INCLUDE_DIR under ${CMAKE_BINARY_DIR}/
+# vcpkg_installed/<triplet> — and outside vcpkg the triplet is empty. The env
+# vars are baked into its ExternalProject at configure time, so instead of
+# patching the fetched extension, materialize the directory it expects from a
+# vcpkg-built static OpenSSL (CI: `vcpkg install openssl --triplet x64-linux`,
+# root passed as DUCQ_VCPKG_OPENSSL_ROOT). vcpkg's archives are self-contained
+# — unlike distro libcrypto.a, which drags in zlib/zstd/jitterentropy and
+# aborts cargo's internal link. Absent root: skip delta like the other
+# probed dependencies (macOS/Windows need none of this; their OpenSSL is
+# discovered through the extension's own non-Linux branches).
 if(UNIX AND NOT APPLE)
-    message(STATUS "DucQ: delta needs vcpkg's OpenSSL layout on Linux — building without delta (see the delta probe comment)")
-    ducq_skip_extension(delta)
+    if(DUCQ_VCPKG_OPENSSL_ROOT
+       AND EXISTS "${DUCQ_VCPKG_OPENSSL_ROOT}/lib/libcrypto.a"
+       AND EXISTS "${DUCQ_VCPKG_OPENSSL_ROOT}/lib/libssl.a"
+       AND EXISTS "${DUCQ_VCPKG_OPENSSL_ROOT}/include/openssl/ssl.h")
+        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/vcpkg_installed/lib"
+                            "${CMAKE_BINARY_DIR}/vcpkg_installed/include")
+        file(COPY "${DUCQ_VCPKG_OPENSSL_ROOT}/lib/libssl.a"
+                  "${DUCQ_VCPKG_OPENSSL_ROOT}/lib/libcrypto.a"
+             DESTINATION "${CMAKE_BINARY_DIR}/vcpkg_installed/lib")
+        file(COPY "${DUCQ_VCPKG_OPENSSL_ROOT}/include/openssl"
+             DESTINATION "${CMAKE_BINARY_DIR}/vcpkg_installed/include")
+        message(STATUS "DucQ: materialized vcpkg OpenSSL layout for delta (${DUCQ_VCPKG_OPENSSL_ROOT})")
+    else()
+        message(STATUS "DucQ: no vcpkg static OpenSSL for delta (set DUCQ_VCPKG_OPENSSL_ROOT) — building without delta")
+        ducq_skip_extension(delta)
+    endif()
 endif()
 
 # httpfs resolves CURL through find_package at configure time (its vcpkg.json
@@ -377,7 +393,21 @@ endif()
 # piggybacks on the same discovery: its loadable target links CURL_LIBRARIES
 # without searching, expecting httpfs's find_package to have populated it —
 # with httpfs skipped, nothing would, so drop postgres here too.
+#
+# DUCQ_CURL_ROOT points at a vcpkg tree (x64-windows-static-md on CI, where
+# MSVC has no discoverable system curl) and is searched first; everything
+# configured after the probe — DuckDB's own httpfs/quack find_package calls —
+# inherits the same prefix path.
+if(DUCQ_CURL_ROOT)
+    list(PREPEND CMAKE_PREFIX_PATH "${DUCQ_CURL_ROOT}")
+endif()
 find_package(CURL QUIET)
+if(MSVC AND DUCQ_CURL_ROOT AND CURL_FOUND)
+    # vcpkg's static-md curl needs consumers to opt out of dllimport before
+    # curl.h is seen; DuckDB's extension targets are configured later in this
+    # same process and pick the definition up from directory scope.
+    add_compile_definitions(CURL_STATICLIB)
+endif()
 if(NOT CURL_FOUND)
     message(STATUS "DucQ: CURL not found — building without httpfs/postgres_scanner (S3/URL reads, ATTACH Postgres; install libcurl4-openssl-dev)")
     ducq_skip_extension(httpfs)
