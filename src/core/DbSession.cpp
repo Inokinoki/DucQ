@@ -70,7 +70,6 @@ bool DbSession::startOpen(const QString &path, const QString &bootstrapSql, cons
     // Unlike open(), the bootstrap SQL is queued, not awaited: this call
     // returns before the ATTACH has even started, and bootstrapFinished
     // carries the outcome once the worker gets to it.
-    m_bootstrapSql = bootstrapSql;
     m_bootstrapping = true;
     QMetaObject::invokeMethod(m_runner, "bootstrapAsync", Qt::QueuedConnection,
                               Q_ARG(QString, bootstrapSql));

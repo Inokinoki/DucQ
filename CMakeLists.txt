@@ -425,6 +425,7 @@ if(DUCQ_CURL_ROOT)
         endif()
     endforeach()
     if(NOT DUCQ_ZLIB_LIBRARY)
+        set(DUCQ_ZLIB_GLOB "") # the warning below prints it even when the sweep never ran
         file(GLOB_RECURSE DUCQ_ZLIB_GLOB "${DUCQ_CURL_ROOT}/*.lib")
         list(FILTER DUCQ_ZLIB_GLOB EXCLUDE REGEX "/debug/")
         list(FILTER DUCQ_ZLIB_GLOB INCLUDE REGEX "/(lib)?(zs|zlib|zlibstatic)(d(1)?)?\\.lib$")

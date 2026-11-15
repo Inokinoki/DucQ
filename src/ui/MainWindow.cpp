@@ -85,22 +85,72 @@ QString translationResourcePath(const QString &code)
 }
 
 #ifdef DUCQ_QUACK
-// Errors whose text suggests the remote side (or the way to it) is gone —
-// as opposed to ordinary SQL failures. Heuristic on the engine's message:
-// a false mark self-heals on the next successful query.
+// One ordered table drives both consumers of a remote attach/query error:
+// looksLikeConnectionError() (should the session be marked lost?) and
+// friendlyConnectError() (what should the user do about it?). The first
+// matching needle decides, so more specific families sit above looser ones.
+enum class RemoteErrorKind {
+    None,
+    Refused,       // host reachable, nothing listening
+    TimedOut,      // connect or read ran out of time
+    Unresolved,    // the address never became a destination
+    TokenRejected, // the server answered and said no
+    TlsFailed,     // the secure handshake itself failed
+    Dropped,       // an established exchange came apart mid-flight
+};
+
+struct RemoteErrorRule {
+    const char *needle; // lowercase; matched against error.toLower()
+    RemoteErrorKind kind;
+};
+
+const RemoteErrorRule kRemoteErrorRules[] = {
+    { "connection refused", RemoteErrorKind::Refused },
+    { "timed out", RemoteErrorKind::TimedOut },
+    { "timeout", RemoteErrorKind::TimedOut },
+    { "unreachable", RemoteErrorKind::Unresolved },
+    { "could not resolve", RemoteErrorKind::Unresolved },
+    { "nodename nor servname", RemoteErrorKind::Unresolved },
+    { "token", RemoteErrorKind::TokenRejected },
+    { "unauthorized", RemoteErrorKind::TokenRejected },
+    { "401", RemoteErrorKind::TokenRejected },
+    { "403", RemoteErrorKind::TokenRejected },
+    { "ssl", RemoteErrorKind::TlsFailed },
+    { "certificate", RemoteErrorKind::TlsFailed },
+    { "tls", RemoteErrorKind::TlsFailed },
+    { "handshake", RemoteErrorKind::TlsFailed },
+    { "reset by peer", RemoteErrorKind::Dropped },
+    { "broken pipe", RemoteErrorKind::Dropped },
+    { "connection closed", RemoteErrorKind::Dropped },
+    { "lost connection", RemoteErrorKind::Dropped },
+};
+
+RemoteErrorKind classifyRemoteError(const QString &error)
+{
+    const QString lower = error.toLower();
+    for (const RemoteErrorRule &rule : kRemoteErrorRules) {
+        if (lower.contains(QLatin1String(rule.needle)))
+            return rule.kind;
+    }
+    return RemoteErrorKind::None;
+}
+
+// True for the kinds that mean the remote side (or the path to it) is gone;
+// a false mark self-heals on the next successful query. Token and TLS
+// rejections come from a living server, so they advise instead of marking:
+// the reconnect action the mark enables cannot fix a wrong token or a bad
+// certificate.
 bool looksLikeConnectionError(const QString &error)
 {
-    static const char *kNeedles[] = {
-        "connection refused", "timed out", "timeout", "unreachable",
-        "could not resolve", "nodename nor servname", "reset by peer",
-        "broken pipe", "connection closed", "lost connection", "handshake",
-    };
-    const QString lower = error.toLower();
-    for (const char *needle : kNeedles) {
-        if (lower.contains(QLatin1String(needle)))
-            return true;
+    switch (classifyRemoteError(error)) {
+    case RemoteErrorKind::Refused:
+    case RemoteErrorKind::TimedOut:
+    case RemoteErrorKind::Unresolved:
+    case RemoteErrorKind::Dropped:
+        return true;
+    default:
+        return false;
     }
-    return false;
 }
 #endif
 
@@ -705,12 +755,16 @@ QString MainWindow::comboTextFor(DbSession *session) const
 
 void MainWindow::markDisconnected(DbSession *session)
 {
-    m_disconnectedSessions.insert(session->id());
-    const int index = m_sessionCombo->findData(session->id());
-    if (index >= 0)
-        m_sessionCombo->setItemText(index, comboTextFor(session));
-    setStatusError(tr("Connection to %1 lost. Reconnect from the File menu to try again.")
-                       .arg(displayNameFor(session)));
+    // First loss raises the alarm; later failures on the same dead session
+    // must not keep re-raising the status bar over whatever the user does.
+    if (!m_disconnectedSessions.contains(session->id())) {
+        m_disconnectedSessions.insert(session->id());
+        const int index = m_sessionCombo->findData(session->id());
+        if (index >= 0)
+            m_sessionCombo->setItemText(index, comboTextFor(session));
+        setStatusError(tr("Connection to %1 lost. Reconnect from the File menu to try again.")
+                           .arg(displayNameFor(session)));
+    }
 #ifdef DUCQ_QUACK
     updateQuackReconnectAction();
 #endif
@@ -877,20 +931,30 @@ void MainWindow::abandonPendingConnect()
 
 QString MainWindow::friendlyConnectError(const QString &server, const QString &raw) const
 {
-    const QString lower = raw.toLower();
+    // Classification shares the ordered needle table with
+    // looksLikeConnectionError(), so the headline and the disconnected mark
+    // can never disagree about what an error means.
     QString headline;
-    if (lower.contains(u"connection refused"))
+    switch (classifyRemoteError(raw)) {
+    case RemoteErrorKind::Refused:
         headline = tr("%1 refused the connection. Is a Quack server running there?").arg(server);
-    else if (lower.contains(u"timed out") || lower.contains(u"timeout"))
+        break;
+    case RemoteErrorKind::TimedOut:
         headline = tr("Connecting to %1 timed out. Check the address and any firewall in between.").arg(server);
-    else if (lower.contains(u"unreachable") || lower.contains(u"could not resolve")
-             || lower.contains(u"nodename nor servname"))
+        break;
+    case RemoteErrorKind::Unresolved:
         headline = tr("%1 could not be resolved or reached. Check the address.").arg(server);
-    else if (lower.contains(u"token") || lower.contains(u"unauthorized") || lower.contains(u"401")
-             || lower.contains(u"403"))
+        break;
+    case RemoteErrorKind::TokenRejected:
         headline = tr("The server at %1 rejected the token.").arg(server);
-    else if (lower.contains(u"ssl") || lower.contains(u"certificate") || lower.contains(u"tls"))
+        break;
+    case RemoteErrorKind::TlsFailed:
         headline = tr("Secure connection to %1 failed (SSL/certificate).").arg(server);
+        break;
+    case RemoteErrorKind::Dropped:
+    case RemoteErrorKind::None:
+        break; // no advice beyond the raw text
+    }
     if (headline.isEmpty())
         return raw;
     // Both: one line that says what to do, the engine text for the details.
@@ -1071,6 +1135,7 @@ void MainWindow::closeConnection()
     DbSession *session = m_activeSession;
     if (!session || !ensureSessionIdle(session))
         return;
+    m_resultTabs->closeSessionTabs(session->id());
 #ifdef DUCQ_QUACK
     // The session's database is going away and its quack_serve instances die
     // with it; make sure that is not a surprise for whoever is connected.
